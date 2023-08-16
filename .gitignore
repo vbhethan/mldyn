@@ -67,3 +67,6 @@ venv.bak/
 
 # VSCODE
 .vscode
+
+# Working/testsing code
+working*
