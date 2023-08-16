@@ -44,7 +44,7 @@ class Edge2Node(MessagePassing):
         )
 
     def forward(self, edge_index, x, edge_attr):
-        return self.propogate(edge_index, x=x, edge_attr=edge_attr)
+        return self.propagate(edge_index, x=x, edge_attr=edge_attr)
 
     def message(self, x_j, x_i, edge_attr):
         out = torch.cat([x_j, x_i, edge_attr], dim=1)
