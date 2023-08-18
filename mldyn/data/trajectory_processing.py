@@ -1,6 +1,7 @@
 import MDAnalysis as mda
 from MDAnalysis.analysis.align import AlignTraj
 import numpy as np
+import h5py
 
 
 
@@ -50,3 +51,25 @@ def make_examples_from_large_trajectory(trajectory_npy_file, num_frames_per_exam
         examples[i] = trajectory[i * num_frames_per_example : (i + 1) * num_frames_per_example]
 
     return examples
+
+def process_large_trajectory_hdf5_to_examples(trajectory_hdf5_file, num_frames_per_example):
+    """
+    Given an hdf5 file with top level datasets called "coordinates" and "velocities", make a series of groups identified by their indices 
+    with datasets with only the number of frames per example
+    """
+
+    with h5py.File(trajectory_hdf5_file, "r") as f:
+        coordinates = f["coordinates"][:]
+        velocities = f["velocities"][:]
+
+    n_frames = coordinates.shape[0]
+    n_examples = n_frames // num_frames_per_example
+
+    
+
+    with h5py.File(trajectory_hdf5_file, "a") as f:
+        f.create_group("examples")
+        for i in range(n_examples):
+            f["examples"].create_group(str(i))
+            f["examples"][str(i)].create_dataset("coordinates", data=coordinates[i * num_frames_per_example : (i + 1) * num_frames_per_example])
+            f["examples"][str(i)].create_dataset("velocities", data=velocities[i * num_frames_per_example : (i + 1) * num_frames_per_example])
