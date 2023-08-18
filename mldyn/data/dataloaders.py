@@ -22,6 +22,8 @@ class DynamicsDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
+        # TODO: assumes right now that you are only loading one example at a time, check if I need to account for a list of indices passed to the 
+        # getitem method
         with h5py.File(self.hdf5_file) as f:
             coordinates = torch.Tensor(f["examples"][f"{idx}"]["coordinates"][:])
             velocities = torch.Tensor(f["examples"][f"{idx}"]["velocities"][:])
