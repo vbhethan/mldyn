@@ -19,51 +19,40 @@ def read_pdb(path_to_pdb):
     return restypes, coordinates
 
 
-restype_one_hot_encoding = {
-    "ALA": 0,
-    "ARG": 1,
-    "ASN": 2,
-    "ASP": 3,
-    "CYS": 4,
-    "GLN": 5,
-    "GLU": 6,
-    "GLY": 7,
-    "HIS": 8,
-    "ILE": 9,
-    "LEU": 10,
-    "LYS": 11,
-    "MET": 12,
-    "PHE": 13,
-    "PRO": 14,
-    "SER": 15,
-    "THR": 16,
-    "TRP": 17,
-    "TYR": 18,
-    "VAL": 19,
-}
-
-for key, value in restype_one_hot_encoding.items():
-    one_hot_vec = np.zeros(20)
-    one_hot_vec[value] = 1
-    restype_one_hot_encoding[key] = one_hot_vec
+def encode_onehot(labels):
+    classes = set(labels)
+    classes_dict = {c: np.identity(len(classes))[i, :] for i, c in enumerate(classes)}
+    encoded_labels = np.array(list(map(classes_dict.get, labels)), dtype=np.int32)
+    return encoded_labels
 
 
 def graph_topology_from_pdb(path_to_pdb):
+    """generates a graph toplogy from a pdb file
+
+    Args:
+        path_to_pdb (str): path to the pdb file
+
+    Returns:
+        x: (N_nodes,dim_embedding) torch.Tensor
+        edge_index: (2,N_edges) torch.Tensor, edge indices in form expected by pytorch_geo
+        edge_attr: (N_edges, 1) torch.Tensor, edge embeddings of pair-wise distances
+
+    """
+    
     restypes, coordinates = read_pdb(path_to_pdb)
     dist_matrix = squareform(pdist(coordinates))
 
     # make a list of one-hot vectors for each residue
-    res_encoding = [restype_one_hot_encoding[restype] for restype in restypes]
-    res_encoding = torch.tensor(res_encoding, dtype=torch.float)
+    res_encodings = encode_onehot(restypes)
 
     edge_index = []
     edge_attr = []
     x = torch.zeros(
-        (len(restypes), 23), dtype=torch.float
-    )  # For now, assuming only positions TODO: detect if velocities available and change hardcoded dimension
-    for i in range(len(restypes)):
+        (len(restypes), res_encodings.shape[1]+3 ), dtype=torch.float
+    )  # For now, assuming only positions (encoding vector length + 3 position dims) TODO: detect if velocities available and change hardcoded dimension
+    for i in range(res_encodings):
         # Add positional data to nodes (i.e., position, for now, will add in velocities later)
-        x[i] = torch.cat([res_encoding[i], coordinates[i, :]], dim=0)
+        x[i] = torch.cat([res_encodings[i], coordinates[i, :]], dim=0)
         for j in range(i + 1, len(restypes)):
             # Add pairwise distance to edges, bidirectional
             edge_index.append([i, j])

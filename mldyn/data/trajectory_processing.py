@@ -2,6 +2,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis.align import AlignTraj
 import numpy as np
 import h5py
+from data_preprocessing import graph_topology_from_pdb
 
 
 
@@ -51,6 +52,15 @@ def make_examples_from_large_trajectory(trajectory_npy_file, num_frames_per_exam
         examples[i] = trajectory[i * num_frames_per_example : (i + 1) * num_frames_per_example]
 
     return examples
+
+def append_graph_structure_to_hdf5(trajectory_hdf5_file, pdb_file):
+    x, edge_index, edge_attr = graph_topology_from_pdb(pdb_file)
+
+    with h5py.File(trajectory_hdf5_file, "r") as f:
+        f.create_group("graph")
+        f["graph"].create_dataset("x", data=x)
+        f["graph"].create_dataset("edge_index", data=edge_index)
+        f["graph"].create_dataset("edge_attr", data=edge_attr)
 
 def process_large_trajectory_hdf5_to_examples(trajectory_hdf5_file, num_frames_per_example):
     """
