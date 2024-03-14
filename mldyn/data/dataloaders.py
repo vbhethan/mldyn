@@ -37,7 +37,7 @@ class DynamicsDataset(Dataset):
 def load_data(file_basename, batch_size=1, data_dir="./sim_data"):
     #NOTE: currently, hard-coding a 3-dimensional dataset, i.e. we only stored positions.
     #TODO: eventually, need to make this general to handle any number of dimensions
-        loc_train = os.path.join(data_dir, "{}.npy".format(file_basename))
+        loc_train = np.load(os.path.join(data_dir, "{}.npy".format(file_basename)))
         #TODO: eventually, implement a train-valid-test split
 
         # Shape [num_samples, num_timesteps, num_atoms, num_dimensions]
@@ -55,7 +55,7 @@ def load_data(file_basename, batch_size=1, data_dir="./sim_data"):
         feat_train = torch.FloatTensor(loc_train)
         train_data = TensorDataset(feat_train)
         train_dataloader = DataLoader(train_data, batch_size=batch_size)  
-        
+
         return train_dataloader, loc_max, loc_min
 
 
