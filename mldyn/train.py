@@ -90,8 +90,8 @@ train_loader, loc_max, loc_min = load_data(args.datafile_basename, batch_size=1,
 
 off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
 
-rel_rec = np.array(encode_onehot(np.where(off_diag)[0]), dtype=np.float32)
-rel_send = np.array(encode_onehot(np.where(off_diag)[1]), dtype=np.float32)
+rel_rec = torch.from_numpy(encode_onehot(np.where(off_diag)[0])).float()
+rel_send = torch.from_numpy(encode_onehot(np.where(off_diag)[1])).float()
 
 # instantiate the MLPEncoder 
 encoder = MLPEncoder(args.timesteps * args.dims, args.encoder_hidden,
@@ -150,6 +150,7 @@ def train(epoch):
     scheduler.step()
 
     for batch_idx, data in enumerate(train_loader):
+        data= data[0]
         if args.cuda:
             data = data.cuda()
         data = Variable(data)
