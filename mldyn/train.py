@@ -1,0 +1,212 @@
+import time
+import argparse
+import pickle
+import os
+import datetime
+
+import torch.optim as optim
+from torch.optim import lr_scheduler
+
+from layers.layers import *
+from utils import *
+from data.dataloaders import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--no-cuda', action='store_true',
+                    default=False, help='Disables CUDA training.')
+parser.add_argument('--seed', type=int, default=42, help='Random seed.')
+parser.add_argument('--epochs', type=int, default=100,
+                    help='Number of epochs to train.')
+parser.add_argument('--lr', type=float, default=5e-4,
+                    help='Initial learning rate.')
+parser.add_argument('--learning_rate_decay', type=float, default=200,
+                    help='Learning rate decay, after how many epochs to decay by gamma.')
+parser.add_argument('--gamma', type=float, default=0.5,
+                    help='Learning rate decay factor.')
+parser.add_argument('--encoder-hidden', type=int, default=256,
+                    help='Number of hidden units.')
+parser.add_argument('--decoder-hidden', type=int, default=256,
+                    help='Number of hidden units.')
+parser.add_argument('--temp', type=float, default=0.5,
+                    help='Temperature for Gumbel softmax.')
+parser.add_argument('--num-atoms', type=int, default=5,
+                    help='Number of particles in simulation.')
+parser.add_argument('--encoder-dropout', type=float, default=0.0,
+                    help='Dropout rate (1 - keep probability).')
+parser.add_argument('--decoder-dropout', type=float, default=0.0,
+                    help='Dropout rate (1 - keep probability).')
+parser.add_argument('--save-folder', type=str, default='logs',
+                    help='Where to save the trained model and other info.')
+parser.add_argument('--load-folder', type=str, default='',
+                    help='Where to load the trained model if finetunning. Leave empty to train from scratch')
+parser.add_argument('--edge-types', type=int, default=2,
+                    help='The number of edge types to infer.')
+parser.add_argument('--dims', type=int, default=6,
+                    help='The number of input dimensions (e.g., position + velocity).')
+parser.add_argument('--timesteps', type=int, default=49,
+                    help='The number of time steps per sample.')
+parser.add_argument('--prediction-steps', type=int, default=10, metavar='N',
+                    help='The number of prediction steps to include in loss')
+parser.add_argument('--skip-first', action='store_true', default=False,
+                    help='Skip first edge type in decoder')
+parser.add_argument('--var', type=float, default=5e-5,
+                    help='Output variance.')
+parser.add_argument('--prior', action='store_true', default=False,
+                    help='Whether to use sparsity prior.')
+parser.add_argument('--temp', type=float, default=0.5,
+                    help='Temperature for Gumbel softmax.')
+
+args = parser.parse_args()
+
+args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
+
+if args.save_folder:
+    exp_counter = 0
+    now = datetime.datetime.now()
+    timestamp = now.isoformat()
+    save_folder = '{}/exp{}/'.format(args.save_folder, timestamp)
+    os.mkdir(save_folder)
+    meta_file = os.path.join(save_folder, 'metadata.pkl')
+    encoder_file = os.path.join(save_folder, 'encoder.pt')
+    decoder_file = os.path.join(save_folder, 'decoder.pt')
+    log_file = os.path.join(save_folder, 'log.txt')
+    log = open(log_file, 'w')
+
+    pickle.dump({'args': args}, open(meta_file, "wb"))
+else:
+    print("NOTE: No save-folder provided! Will not save anything.")
+    print("Testing will not work!")
+
+
+train_loader, loc_max, loc_min = load_data('data', batch_size=1)
+
+off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
+
+rel_rec = np.array(encode_onehot(np.where(off_diag)[0]), dtype=np.float32)
+rel_send = np.array(encode_onehot(np.where(off_diag)[1]), dtype=np.float32)
+
+# instantiate the MLPEncoder 
+encoder = MLPEncoder(args.timesteps * args.dims, args.encoder_hidden,
+                     args.edge_types,
+                     args.encoder_dropout)
+
+
+decoder = MLPDecoder(n_in_node=args.dims,
+                     edge_types=args.edge_types,
+                     msg_hid=args.decoder_hidden,
+                     msg_out=args.decoder_hidden,
+                     n_hid=args.decoder_hidden,
+                     do_prob=args.decoder_dropout,
+                     skip_first=args.skip_first)
+
+if args.load_folder:
+    encoder_file = os.join(args.load_folder, 'encoder.pt')
+    encoder.load_state_dict(torch.load(encoder_file))
+    decoder_file = os.join(args.load_folder, 'decoder.pt')
+    decoder.load_state_dict(torch.load(decoder_file))
+
+    args.save_folder = False
+
+optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()),
+                       lr=args.lr)
+
+scheduler = lr_scheduler.StepLR(optimizer, step_size=args.learning_rate_decay,
+                                gamma=args.gamma)
+
+triu_indices = get_triu_indices(args.num_atoms)
+tril_indices = get_tril_indices(args.num_atoms)
+
+if args.prior:
+    raise NotImplementedError("Sparsity prior is not implemented yet.")
+
+if args.cuda:
+    encoder.cuda()
+    decoder.cuda()
+    rel_rec.cuda()
+    rel_send.cuda()
+    triu_indices.cuda()
+    tril_indices.cuda()
+
+rel_rec = Variable(rel_rec)
+rel_send = Variable(rel_send)
+
+def train(epoch):
+    t = time.time()
+    nll_train = []
+    acc_train = []
+    kl_train = []
+    mse_train = []
+
+    encoder.train()
+    decoder.train()
+    scheduler.step()
+
+    for batch_idx, data in enumerate(train_loader):
+        if args.cuda:
+            data = data.cuda()
+        data = Variable(data)
+
+        optimizer.zero_grad()
+
+        logits = encoder(data, rel_rec, rel_send)
+        edges = gumbel_softmax(logits, tau=args.temp, hard=True)
+        prob = my_softmax(logits, -1)
+
+
+        output = decoder(data, edges, rel_rec, rel_send,
+                         args.prediction_steps)
+        
+        target = data[:, :, 1:, :]
+
+        loss_nll = nll_gaussian(output, target, args.var)
+
+        if args.prior:
+            raise NotImplementedError("Sparsity prior is not implemented yet.")
+        else:
+            loss_kl = kl_categorical_uniform(prob, args.num_atoms,
+                                             args.edge_types)
+            
+        loss = loss_nll + loss_kl
+
+        loss.backward()
+        optimizer.step()
+
+        mse_train.append(F.mse_loss(output, target).data[0])
+        nll_train.append(loss_nll.data[0])
+        kl_train.append(loss_kl.data[0])
+
+        print('Epoch: {:04d}'.format(epoch),
+            'nll_train: {:.10f}'.format(np.mean(nll_train)),
+            'kl_train: {:.10f}'.format(np.mean(kl_train)),
+            'mse_train: {:.10f}'.format(np.mean(mse_train)),
+            'acc_train: {:.10f}'.format(np.mean(acc_train)),
+            'time: {:.4f}s'.format(time.time() - t))
+        
+        if args.save_folder:
+            torch.save(encoder.state_dict(), encoder_file)
+            torch.save(decoder.state_dict(), decoder_file)
+            print('Epoch: {:04d}'.format(epoch),
+                  'nll_train: {:.10f}'.format(np.mean(nll_train)),
+                  'kl_train: {:.10f}'.format(np.mean(kl_train)),
+                  'mse_train: {:.10f}'.format(np.mean(mse_train)),
+                  'acc_train: {:.10f}'.format(np.mean(acc_train)),
+                  'time: {:.4f}s'.format(time.time() - t), file=log)
+            log.flush()
+
+    return np.mean(nll_train)
+        
+# Train model
+t_total = time.time()
+for epoch in range(args.epochs):
+    train_loss = train(epoch)
+    print("Finished with epoch: ", epoch)
+    if args.save_folder:
+        print("Finished with Model Training, saved to {}".format(save_folder))
+        print("Epoch {}: Loss: {}".format(epoch, train_loss), file=log)
+        log.flush()
