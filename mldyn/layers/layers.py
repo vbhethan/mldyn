@@ -115,3 +115,61 @@ class MLPDecoder(nn.Module):
         senders = torch.matmul(rel_send, single_timestep_inputs)
         pre_msg = torch.cat([receivers, senders], dim=-1)
         
+        if single_timestep_inputs.is_cuda:
+            all_msgs = all_msgs.cuda()
+        
+        if self.skip_first_edge_type:
+            start_idx = 1
+        else:
+            start_idx = 0
+        
+        for i in range(start_idx, len(self.msg_fc2)):
+            msg = F.relu(self.msg_fc1[i](pre_msg))
+            msg = F.dropout(msg, p=self.dropout_prob)
+            msg = F.relu(self.msg_fc2[i](msg))
+            msg = msg * single_timestep_rel_type[:, :, :, i:i + 1]
+            all_msgs += msg
+
+        agg_msgs = all_msgs.transpose(-2,-1).matmul(rel_rec).transpose(-2,-1)
+        agg_msgs = agg_msgs.contiguous()
+
+        # Concatenates the inputs to make the skip connection
+        aug_inputs = torch.cat([single_timestep_inputs, agg_msgs], dim=-1)
+
+        pred = F.dropout(F.relu(self.out_fc1(aug_inputs)), p=self.dropout_prob)
+        pred = F.dropout(F.relu(self.out_fc2(pred)), p=self.dropout_prob)
+        pred = self.out_fc3(pred)
+
+        return single_timestep_inputs + pred 
+    
+    def forward(self, inputs, rel_type, rel_rec, rel_send, pred_steps=1):
+        inputs = inputs.transpose(-2, -1).contiguous()
+
+        sizes = [rel_type.size(0), inputs.size(1), rel_type.size(1), rel_type.size(2)]
+        rel_type = rel_type.unsqueeze(1).expand(sizes)
+
+        time_steps = inputs.size(1)
+        assert(pred_steps <= time_steps)
+        preds = []
+
+        last_pred = inputs[:,0::pred_steps, :, :]
+        curr_rel_type = rel_type[:,0::pred_steps, :, :]
+
+        for step in range(0, pred_steps):
+            last_pred = self.single_step_forward(last_pred, rel_rec, rel_send, curr_rel_type)
+            preds.append(last_pred)
+
+
+        sizes = [preds[0].size(0), preds.size[0](1)*pred_steps, preds[0].size(2), preds[0].size(3)]
+        
+        output = Variable(torch.zeros(sizes))
+
+        if inputs.is_cuda:
+            output = output.cuda()
+        
+        for i in range(len(preds)):
+            output[:, i::pred_steps, :, :] = preds[i]
+
+        pred_all = output[:, :(inputs.size(1) - 1), :, :]
+
+        return pred_all.transpose(-2, -1).contiguous()
