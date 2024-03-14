@@ -53,8 +53,6 @@ parser.add_argument('--var', type=float, default=5e-5,
                     help='Output variance.')
 parser.add_argument('--prior', action='store_true', default=False,
                     help='Whether to use sparsity prior.')
-parser.add_argument('--temp', type=float, default=0.5,
-                    help='Temperature for Gumbel softmax.')
 parser.add_argument('--datafile-basename', type=str, default='data',
                     help='The basename of the npy file containing the data.')
 parser.add_argument('--data-dir', type=str, default='./sim_data',
