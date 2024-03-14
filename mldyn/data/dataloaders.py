@@ -1,6 +1,6 @@
 import os
 import h5py
-from torch.utils.data import Dataset, Dataloader
+from torch.utils.data import Dataset, DataLoader  
 from torch.utils.data.dataset import TensorDataset
 import torch
 import numpy as np
@@ -54,8 +54,8 @@ def load_data(file_basename, batch_size=1, data_dir="./sim_data"):
 
         feat_train = torch.FloatTensor(loc_train)
         train_data = TensorDataset(feat_train)
-        train_dataloader = Dataloader(train_data, batch_size=batch_size)
-
+        train_dataloader = DataLoader(train_data, batch_size=batch_size)  
+        
         return train_dataloader, loc_max, loc_min
 
 
