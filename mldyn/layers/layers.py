@@ -18,25 +18,25 @@ class MLP(nn.Module):
 
         self.init_weights()
 
-        def init_weights(self):
-            for m in self.modules():
-                if isinstance(m, nn.Linear):
-                    nn.init.xavier_normal_(m.weight.data)
-                    m.bias.data.fill_(0.1)
-                elif isinstance(m, nn.BatchNorm1d):
-                    m.weight.data.fill_(1)
-                    m.bias.data.zero_()
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight.data)
+                m.bias.data.fill_(0.1)
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
-        def batch_norm(self, inputs):
-            x = inputs.view(inputs.size(0) * inputs.size(1), -1)
-            x = self.bn(x)
-            return x.view(inputs.size(0), inputs.size(1), -1)
-        
-        def forward(self, x):
-            x = F.elu(self.fc1(x))
-            x = F.droupout(x, self.dropout_prob, training=self.training)
-            x = F.elu(self.fc2(x)) 
-            return self.batch_norm(x)
+    def batch_norm(self, inputs):
+        x = inputs.view(inputs.size(0) * inputs.size(1), -1)
+        x = self.bn(x)
+        return x.view(inputs.size(0), inputs.size(1), -1)
+    
+    def forward(self, x):
+        x = F.elu(self.fc1(x))
+        x = F.droupout(x, self.dropout_prob, training=self.training)
+        x = F.elu(self.fc2(x)) 
+        return self.batch_norm(x)
         
 class MLPEncoder(nn.Module):
 
