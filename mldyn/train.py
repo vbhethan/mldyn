@@ -41,7 +41,7 @@ parser.add_argument('--load-folder', type=str, default='',
                     help='Where to load the trained model if finetunning. Leave empty to train from scratch')
 parser.add_argument('--edge-types', type=int, default=2,
                     help='The number of edge types to infer.')
-parser.add_argument('--dims', type=int, default=6,
+parser.add_argument('--dims', type=int, default=3,
                     help='The number of input dimensions (e.g., position + velocity).')
 parser.add_argument('--timesteps', type=int, default=49,
                     help='The number of time steps per sample.')
@@ -55,6 +55,10 @@ parser.add_argument('--prior', action='store_true', default=False,
                     help='Whether to use sparsity prior.')
 parser.add_argument('--temp', type=float, default=0.5,
                     help='Temperature for Gumbel softmax.')
+parser.add_argument('--datafile-basename', type=str, default='data',
+                    help='The basename of the npy file containing the data.')
+parser.add_argument('--data-dir', type=str, default='./sim_data',
+                    help='The directory containing the data.')
 
 args = parser.parse_args()
 
@@ -84,7 +88,7 @@ else:
     print("Testing will not work!")
 
 
-train_loader, loc_max, loc_min = load_data('data', batch_size=1)
+train_loader, loc_max, loc_min = load_data(args.datafile_basename, batch_size=1, data_dir=args.data_dir)
 
 off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
 
