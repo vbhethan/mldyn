@@ -34,7 +34,7 @@ class MLP(nn.Module):
     
     def forward(self, x):
         x = F.elu(self.fc1(x))
-        x = F.droupout(x, self.dropout_prob, training=self.training)
+        x = F.dropout(x, self.dropout_prob, training=self.training)
         x = F.elu(self.fc2(x)) 
         return self.batch_norm(x)
         
@@ -143,7 +143,8 @@ class MLPDecoder(nn.Module):
         return single_timestep_inputs + pred 
     
     def forward(self, inputs, rel_type, rel_rec, rel_send, pred_steps=1):
-        inputs = inputs.transpose(-2, -1).contiguous()
+        inputs = inputs.transpose(1, 2).contiguous()
+        print("inputs shape after transpose", inputs.shape)
 
         sizes = [rel_type.size(0), inputs.size(1), rel_type.size(1), rel_type.size(2)]
         rel_type = rel_type.unsqueeze(1).expand(sizes)
@@ -153,6 +154,7 @@ class MLPDecoder(nn.Module):
         preds = []
 
         last_pred = inputs[:,0::pred_steps, :, :]
+        print("last_pred shape", last_pred.shape)
         curr_rel_type = rel_type[:,0::pred_steps, :, :]
 
         for step in range(0, pred_steps):

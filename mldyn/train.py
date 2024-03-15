@@ -43,7 +43,7 @@ parser.add_argument('--edge-types', type=int, default=2,
                     help='The number of edge types to infer.')
 parser.add_argument('--dims', type=int, default=3,
                     help='The number of input dimensions (e.g., position + velocity).')
-parser.add_argument('--timesteps', type=int, default=49,
+parser.add_argument('--timesteps', type=int, default=50,
                     help='The number of time steps per sample.')
 parser.add_argument('--prediction-steps', type=int, default=10, metavar='N',
                     help='The number of prediction steps to include in loss')
@@ -91,6 +91,7 @@ train_loader, loc_max, loc_min = load_data(args.datafile_basename, batch_size=1,
 off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
 
 rel_rec = torch.from_numpy(encode_onehot(np.where(off_diag)[0])).float()
+# print(rel_rec.shape)
 rel_send = torch.from_numpy(encode_onehot(np.where(off_diag)[1])).float()
 
 # instantiate the MLPEncoder 
@@ -99,7 +100,7 @@ encoder = MLPEncoder(args.timesteps * args.dims, args.encoder_hidden,
                      args.encoder_dropout)
 
 
-decoder = MLPDecoder(n_in_node=args.dims,
+decoder = MLPDecoder(n_in_node=args.num_atoms,
                      edge_types=args.edge_types,
                      msg_hid=args.decoder_hidden,
                      msg_out=args.decoder_hidden,
@@ -147,13 +148,12 @@ def train(epoch):
 
     encoder.train()
     decoder.train()
-    scheduler.step()
 
-    for batch_idx, data in enumerate(train_loader):
-        data= data[0]
+    for batch_idx, example in enumerate(train_loader):
+        data = example[0] # There is only one tensor associated with each example
+        print("data shape", data.shape)
         if args.cuda:
             data = data.cuda()
-        data = Variable(data)
 
         optimizer.zero_grad()
 
@@ -179,6 +179,7 @@ def train(epoch):
 
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
         mse_train.append(F.mse_loss(output, target).data[0])
         nll_train.append(loss_nll.data[0])

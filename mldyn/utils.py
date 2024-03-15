@@ -4,12 +4,15 @@ from torch.utils.data.dataset import TensorDataset
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from torch.autograd import Variable
+import numpy as np
 
 # see github.com/ethanfetaya/NRI and github.com/loeweX/AmortizedCausalDiscovery
 
+import torch.nn.functional as F
+
 def my_softmax(input, axis=1):
     trans_input = input.transpose(axis, 0).contiguous()
-    soft_max_1d = F.softmax(trans_input)
+    soft_max_1d = F.softmax(trans_input, dim=0)
     return soft_max_1d.transpose(axis, 0)
 
 

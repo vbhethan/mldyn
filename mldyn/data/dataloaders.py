@@ -40,8 +40,8 @@ def load_data(file_basename, batch_size=1, data_dir="./sim_data"):
         loc_train = np.load(os.path.join(data_dir, "{}.npy".format(file_basename)))
         #TODO: eventually, implement a train-valid-test split
 
-        # Shape [num_samples, num_timesteps, num_atoms, num_dimensions]
-        num_atoms = loc_train.shape[2]  # Fix: calculate the number of atoms correctly
+        # # Shape [num_samples, num_timesteps, num_atoms, num_dimensions]
+        # num_atoms = loc_train.shape[2]  # Fix: calculate the number of atoms correctly
 
         loc_max = loc_train.max()
         loc_min = loc_train.min()
@@ -57,5 +57,3 @@ def load_data(file_basename, batch_size=1, data_dir="./sim_data"):
         train_dataloader = DataLoader(train_data, batch_size=batch_size)  
 
         return train_dataloader, loc_max, loc_min
-
-
