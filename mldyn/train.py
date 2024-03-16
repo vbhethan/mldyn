@@ -100,7 +100,7 @@ encoder = MLPEncoder(args.timesteps * args.dims, args.encoder_hidden,
                      args.encoder_dropout)
 
 
-decoder = MLPDecoder(n_in_node=args.num_atoms,
+decoder = MLPDecoder(n_in_node=args.dims,
                      edge_types=args.edge_types,
                      msg_hid=args.decoder_hidden,
                      msg_out=args.decoder_hidden,
@@ -142,7 +142,6 @@ rel_send = Variable(rel_send)
 def train(epoch):
     t = time.time()
     nll_train = []
-    acc_train = []
     kl_train = []
     mse_train = []
 
@@ -166,7 +165,8 @@ def train(epoch):
                          args.prediction_steps)
         
         target = data[:, :, 1:, :]
-
+        print("output shape", output.shape)
+        print("target shape", target.shape)
         loss_nll = nll_gaussian(output, target, args.var)
 
         if args.prior:
@@ -181,16 +181,15 @@ def train(epoch):
         optimizer.step()
         scheduler.step()
 
-        mse_train.append(F.mse_loss(output, target).data[0])
-        nll_train.append(loss_nll.data[0])
-        kl_train.append(loss_kl.data[0])
+        mse_train.append(F.mse_loss(output, target).item())
+        nll_train.append(loss_nll.item())
+        kl_train.append(loss_kl.item())
 
-        print('Epoch: {:04d}'.format(epoch),
-            'nll_train: {:.10f}'.format(np.mean(nll_train)),
-            'kl_train: {:.10f}'.format(np.mean(kl_train)),
-            'mse_train: {:.10f}'.format(np.mean(mse_train)),
-            'acc_train: {:.10f}'.format(np.mean(acc_train)),
-            'time: {:.4f}s'.format(time.time() - t))
+        print(f'Epoch: {epoch:04d}',
+            f'nll_train: {np.mean(nll_train):.10f}',
+            f'kl_train: {np.mean(kl_train):.10f}',
+            f'mse_train: {np.mean(mse_train):.10f}',
+            f'time: {time.time() - t:.4f}s')
         
         if args.save_folder:
             torch.save(encoder.state_dict(), encoder_file)
@@ -198,8 +197,7 @@ def train(epoch):
             print('Epoch: {:04d}'.format(epoch),
                   'nll_train: {:.10f}'.format(np.mean(nll_train)),
                   'kl_train: {:.10f}'.format(np.mean(kl_train)),
-                  'mse_train: {:.10f}'.format(np.mean(mse_train)),
-                  'acc_train: {:.10f}'.format(np.mean(acc_train)),
+                  'mse_train: {:.10f}'.format(np.mean(mse_train)),,
                   'time: {:.4f}s'.format(time.time() - t), file=log)
             log.flush()
 

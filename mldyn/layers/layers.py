@@ -114,6 +114,9 @@ class MLPDecoder(nn.Module):
         receivers = torch.matmul(rel_rec, single_timestep_inputs)
         senders = torch.matmul(rel_send, single_timestep_inputs)
         pre_msg = torch.cat([receivers, senders], dim=-1)
+
+        all_msgs = torch.zeros(pre_msg.size(0), pre_msg.size(1),
+                               pre_msg.size(2), self.msg_out_shape)
         
         if single_timestep_inputs.is_cuda:
             all_msgs = all_msgs.cuda()
@@ -161,8 +164,8 @@ class MLPDecoder(nn.Module):
             last_pred = self.single_step_forward(last_pred, rel_rec, rel_send, curr_rel_type)
             preds.append(last_pred)
 
-
-        sizes = [preds[0].size(0), preds.size[0](1)*pred_steps, preds[0].size(2), preds[0].size(3)]
+        print("preds[0]: ", preds[0])
+        sizes = [preds[0].size(0), preds[0].size(1)*pred_steps, preds[0].size(2), preds[0].size(3)]
         
         output = Variable(torch.zeros(sizes))
 
@@ -174,4 +177,4 @@ class MLPDecoder(nn.Module):
 
         pred_all = output[:, :(inputs.size(1) - 1), :, :]
 
-        return pred_all.transpose(-2, -1).contiguous()
+        return pred_all.transpose(1,2).contiguous()
