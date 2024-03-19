@@ -147,7 +147,7 @@ class MLPDecoder(nn.Module):
     
     def forward(self, inputs, rel_type, rel_rec, rel_send, pred_steps=1):
         inputs = inputs.transpose(1, 2).contiguous()
-        print("inputs shape after transpose", inputs.shape)
+        # print("inputs shape after transpose", inputs.shape)
 
         sizes = [rel_type.size(0), inputs.size(1), rel_type.size(1), rel_type.size(2)]
         rel_type = rel_type.unsqueeze(1).expand(sizes)
@@ -157,14 +157,14 @@ class MLPDecoder(nn.Module):
         preds = []
 
         last_pred = inputs[:,0::pred_steps, :, :]
-        print("last_pred shape", last_pred.shape)
+        # print("last_pred shape", last_pred.shape)
         curr_rel_type = rel_type[:,0::pred_steps, :, :]
 
         for step in range(0, pred_steps):
             last_pred = self.single_step_forward(last_pred, rel_rec, rel_send, curr_rel_type)
             preds.append(last_pred)
 
-        print("preds[0]: ", preds[0])
+        # print("preds[0]: ", preds[0])
         sizes = [preds[0].size(0), preds[0].size(1)*pred_steps, preds[0].size(2), preds[0].size(3)]
         
         output = Variable(torch.zeros(sizes))

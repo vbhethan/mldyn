@@ -91,7 +91,6 @@ train_loader, loc_max, loc_min = load_data(args.datafile_basename, batch_size=1,
 off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
 
 rel_rec = torch.from_numpy(encode_onehot(np.where(off_diag)[0])).float()
-# print(rel_rec.shape)
 rel_send = torch.from_numpy(encode_onehot(np.where(off_diag)[1])).float()
 
 # instantiate the MLPEncoder 
@@ -150,7 +149,7 @@ def train(epoch):
 
     for batch_idx, example in enumerate(train_loader):
         data = example[0] # There is only one tensor associated with each example
-        print("data shape", data.shape)
+        # print("data shape", data.shape)
         if args.cuda:
             data = data.cuda()
 
@@ -165,8 +164,8 @@ def train(epoch):
                          args.prediction_steps)
         
         target = data[:, :, 1:, :]
-        print("output shape", output.shape)
-        print("target shape", target.shape)
+        # print("output shape", output.shape)
+        # print("target shape", target.shape)
         loss_nll = nll_gaussian(output, target, args.var)
 
         if args.prior:
@@ -208,7 +207,8 @@ t_total = time.time()
 for epoch in range(args.epochs):
     train_loss = train(epoch)
     print("Finished with epoch: ", epoch)
-    if args.save_folder:
-        print("Finished with Model Training, saved to {}".format(save_folder))
-        print("Epoch {}: Loss: {}".format(epoch, train_loss), file=log)
-        log.flush()
+    
+if args.save_folder:
+    print("Finished with Model Training, saved to {}".format(save_folder))
+    print("Epoch {}: Loss: {}".format(epoch, train_loss), file=log)
+    log.flush()
