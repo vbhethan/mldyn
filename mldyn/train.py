@@ -207,7 +207,9 @@ t_total = time.time()
 for epoch in range(args.epochs):
     train_loss = train(epoch)
     print("Finished with epoch: ", epoch)
-    
+
+print("Optimization Finished!")
+
 if args.save_folder:
     print("Finished with Model Training, saved to {}".format(save_folder))
     print("Epoch {}: Loss: {}".format(epoch, train_loss), file=log)
