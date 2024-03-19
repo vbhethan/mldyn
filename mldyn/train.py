@@ -197,7 +197,7 @@ def train(epoch):
             print('Epoch: {:04d}'.format(epoch),
                   'nll_train: {:.10f}'.format(np.mean(nll_train)),
                   'kl_train: {:.10f}'.format(np.mean(kl_train)),
-                  'mse_train: {:.10f}'.format(np.mean(mse_train)),,
+                  'mse_train: {:.10f}'.format(np.mean(mse_train)),
                   'time: {:.4f}s'.format(time.time() - t), file=log)
             log.flush()
 
