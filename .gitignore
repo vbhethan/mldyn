@@ -70,3 +70,6 @@ venv.bak/
 
 # Working/testsing code
 working*
+
+# Logs
+logs
