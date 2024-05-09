@@ -9,8 +9,11 @@ import os
 import datetime
 import numpy as np
 
+import torch
 import torch.optim as optim
 from torch.optim import lr_scheduler
+from torch.autograd import Variable
+import torch.nn.functional as F
 
 from mldyn.layers.layers import MLPEncoder, MLPDecoder
 from mldyn.utils import (
@@ -177,9 +180,9 @@ decoder = MLPDecoder(
 )
 
 if args.load_folder:
-    encoder_file = os.join(args.load_folder, "encoder.pt")
+    encoder_file = os.path.join(args.load_folder, "encoder.pt")
     encoder.load_state_dict(torch.load(encoder_file))
-    decoder_file = os.join(args.load_folder, "decoder.pt")
+    decoder_file = os.path.join(args.load_folder, "decoder.pt")
     decoder.load_state_dict(torch.load(decoder_file))
 
     args.save_folder = False
