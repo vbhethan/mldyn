@@ -1,3 +1,7 @@
+"""
+Training script for NRI model
+"""
+
 import time
 import argparse
 import pickle
@@ -8,9 +12,17 @@ import numpy as np
 import torch.optim as optim
 from torch.optim import lr_scheduler
 
-from mldyn.layers.layers import *
-from mldyn.utils import *
-from mldyn.data.dataloaders import *
+from mldyn.layers.layers import MLPEncoder, MLPDecoder
+from mldyn.utils import (
+    encode_onehot,
+    get_triu_indices,
+    get_tril_indices,
+    gumbel_softmax,
+    my_softmax,
+    nll_gaussian,
+    kl_categorical_uniform,
+)
+from mldyn.data.dataloaders import load_data
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
