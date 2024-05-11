@@ -35,7 +35,7 @@ def generate_coarse_grained_structure(timestep, ca_indices, cb_indices):
             timestep.positions[ca_indices],
             timestep.positions[cb_indices] - timestep.positions[ca_indices],
         ),
-        axis=0,
+        axis=1,
     )
 
     return coarse_grained_positions
