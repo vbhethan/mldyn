@@ -5,7 +5,6 @@ import h5py
 from data_preprocessing import graph_topology_from_pdb
 
 
-
 def align_trajectory(topology_file, trajectory_coordinate_file, output_trajectory_file):
     # TODO: it's possible I don't want to align my trajectories prior to training...
     # Will consider removing this function, at least in this package
@@ -38,6 +37,7 @@ def trajectory_to_npy(topology_file, trajectory_coordinate_file, npy_fileout):
 
     np.save(npy_fileout, trajectory)
 
+
 def make_examples_from_large_trajectory(trajectory_npy_file, num_frames_per_example):
     """ """
 
@@ -46,12 +46,17 @@ def make_examples_from_large_trajectory(trajectory_npy_file, num_frames_per_exam
     n_frames = trajectory.shape[0]
     n_examples = n_frames // num_frames_per_example
 
-    examples = np.zeros((n_examples, num_frames_per_example, trajectory.shape[1], trajectory.shape[2]))
+    examples = np.zeros(
+        (n_examples, num_frames_per_example, trajectory.shape[1], trajectory.shape[2])
+    )
 
     for i in range(n_examples):
-        examples[i] = trajectory[i * num_frames_per_example : (i + 1) * num_frames_per_example]
+        examples[i] = trajectory[
+            i * num_frames_per_example : (i + 1) * num_frames_per_example
+        ]
 
     return examples
+
 
 def append_graph_structure_to_hdf5(trajectory_hdf5_file, pdb_file):
     x, edge_index, edge_attr = graph_topology_from_pdb(pdb_file)
@@ -62,9 +67,12 @@ def append_graph_structure_to_hdf5(trajectory_hdf5_file, pdb_file):
         f["graph"].create_dataset("edge_index", data=edge_index)
         f["graph"].create_dataset("edge_attr", data=edge_attr)
 
-def process_large_trajectory_hdf5_to_examples(trajectory_hdf5_file, num_frames_per_example):
+
+def process_large_trajectory_hdf5_to_examples(
+    trajectory_hdf5_file, num_frames_per_example
+):
     """
-    Given an hdf5 file with top level datasets called "coordinates" and "velocities", make a series of groups identified by their indices 
+    Given an hdf5 file with top level datasets called "coordinates" and "velocities", make a series of groups identified by their indices
     with datasets with only the number of frames per example
     """
 
@@ -75,11 +83,19 @@ def process_large_trajectory_hdf5_to_examples(trajectory_hdf5_file, num_frames_p
     n_frames = coordinates.shape[0]
     n_examples = n_frames // num_frames_per_example
 
-    
-
     with h5py.File(trajectory_hdf5_file, "a") as f:
         f.create_group("examples")
         for i in range(n_examples):
             f["examples"].create_group(str(i))
-            f["examples"][str(i)].create_dataset("coordinates", data=coordinates[i * num_frames_per_example : (i + 1) * num_frames_per_example])
-            f["examples"][str(i)].create_dataset("velocities", data=velocities[i * num_frames_per_example : (i + 1) * num_frames_per_example])
+            f["examples"][str(i)].create_dataset(
+                "coordinates",
+                data=coordinates[
+                    i * num_frames_per_example : (i + 1) * num_frames_per_example
+                ],
+            )
+            f["examples"][str(i)].create_dataset(
+                "velocities",
+                data=velocities[
+                    i * num_frames_per_example : (i + 1) * num_frames_per_example
+                ],
+            )
