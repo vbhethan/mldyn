@@ -1,8 +1,9 @@
-import torch
 from pathlib import Path
-from torch_geometric.data import Data
+import torch
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
+
+# from torch_geometric.data import Data
 
 
 def read_pdb(path_to_pdb):
@@ -38,7 +39,7 @@ def graph_topology_from_pdb(path_to_pdb):
         edge_attr: (N_edges, 1) torch.Tensor, edge embeddings of pair-wise distances
 
     """
-    
+
     restypes, coordinates = read_pdb(path_to_pdb)
     dist_matrix = squareform(pdist(coordinates))
 
@@ -48,7 +49,7 @@ def graph_topology_from_pdb(path_to_pdb):
     edge_index = []
     edge_attr = []
     x = torch.zeros(
-        (len(restypes), res_encodings.shape[1]+3 ), dtype=torch.float
+        (len(restypes), res_encodings.shape[1] + 3), dtype=torch.float
     )  # For now, assuming only positions (encoding vector length + 3 position dims) TODO: detect if velocities available and change hardcoded dimension
     for i in range(res_encodings):
         # Add positional data to nodes (i.e., position, for now, will add in velocities later)

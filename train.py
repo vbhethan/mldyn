@@ -203,12 +203,12 @@ if args.prior:
     raise NotImplementedError("Sparsity prior is not implemented yet.")
 
 if args.cuda:
-    encoder.to(device)
-    decoder.to(device)
-    rel_rec.to(device)
-    rel_send.to(device)
-    triu_indices.to(device)
-    tril_indices.to(device)
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
+    rel_rec = rel_rec.to(device)
+    rel_send = rel_send.to(device)
+    triu_indices = triu_indices.to(device)
+    tril_indices = tril_indices.to(device)
 
 
 def train(epoch):
@@ -221,7 +221,8 @@ def train(epoch):
     decoder.train()
 
     for batch_idx, example in enumerate(train_loader):
-        data = example.to(device)
+        data = torch.stack(list(example)).to(device)
+        data = data.squeeze(0)
 
         optimizer.zero_grad()
 
