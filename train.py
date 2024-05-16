@@ -132,6 +132,7 @@ torch.manual_seed(args.seed)
 
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
+    device = torch.device("cuda")
 
 if args.save_folder:
     exp_counter = 0
@@ -202,15 +203,12 @@ if args.prior:
     raise NotImplementedError("Sparsity prior is not implemented yet.")
 
 if args.cuda:
-    encoder.cuda()
-    decoder.cuda()
-    rel_rec.cuda()
-    rel_send.cuda()
-    triu_indices.cuda()
-    tril_indices.cuda()
-
-rel_rec = Variable(rel_rec)
-rel_send = Variable(rel_send)
+    encoder.to(device)
+    decoder.to(device)
+    rel_rec.to(device)
+    rel_send.to(device)
+    triu_indices.to(device)
+    tril_indices.to(device)
 
 
 def train(epoch):
@@ -223,10 +221,7 @@ def train(epoch):
     decoder.train()
 
     for batch_idx, example in enumerate(train_loader):
-        data = example[0]  # There is only one tensor associated with each example
-        # print("data shape", data.shape)
-        if args.cuda:
-            data = data.cuda()
+        data = example.to(device)
 
         optimizer.zero_grad()
 

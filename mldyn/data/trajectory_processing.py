@@ -2,7 +2,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis.align import AlignTraj
 import numpy as np
 import h5py
-from data_preprocessing import graph_topology_from_pdb
+from mldyn.data.data_preprocessing import graph_topology_from_pdb
 
 
 def align_trajectory(topology_file, trajectory_coordinate_file, output_trajectory_file):
@@ -22,6 +22,10 @@ def align_trajectory(topology_file, trajectory_coordinate_file, output_trajector
 
 
 def trajectory_to_npy(topology_file, trajectory_coordinate_file, npy_fileout):
+    """
+    Converts a trajectory, using a topology and trajectory file compatible with
+    MDAnalysis, to a numpy array
+    """
 
     # For now, only positions TODO: think about velocities
     u = mda.Universe(topology_file, trajectory_coordinate_file)
@@ -77,8 +81,8 @@ def process_large_trajectory_hdf5_to_examples(
     """
 
     with h5py.File(trajectory_hdf5_file, "r") as f:
-        coordinates = f["coordinates"][:]
-        velocities = f["velocities"][:]
+        coordinates = np.array(f["coordinates"][()])
+        velocities = np.array(f["velocities"][()])
 
     n_frames = coordinates.shape[0]
     n_examples = n_frames // num_frames_per_example
