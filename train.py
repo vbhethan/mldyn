@@ -211,7 +211,7 @@ if args.cuda:
     tril_indices = tril_indices.to(device)
 
 
-def train(epoch):
+def train(epoch, wandbrun=None):
     t = time.time()
     nll_train = []
     kl_train = []
@@ -264,14 +264,23 @@ def train(epoch):
             torch.save(encoder.state_dict(), encoder_file)
             torch.save(decoder.state_dict(), decoder_file)
             print(
-                "Epoch: {:04d}".format(epoch),
-                "nll_train: {:.10f}".format(np.mean(nll_train)),
-                "kl_train: {:.10f}".format(np.mean(kl_train)),
-                "mse_train: {:.10f}".format(np.mean(mse_train)),
-                "time: {:.4f}s".format(time.time() - t),
+                f"Epoch: {epoch:04d}",
+                f"nll_train: {np.mean(nll_train):.10f}",
+                f"kl_train: {np.mean(kl_train):.10f}",
+                f"mse_train: {np.mean(mse_train):.10f}",
+                f"time: {time.time() - t:.4f}s",
                 file=log,
             )
-            log.flush()
+
+    if wandbrun is not None:
+        run.log(
+            {
+                "train/nll_train": np.mean(nll_train),
+                "train/kl_train": np.mean(kl_train),
+                "train/mse_train": np.mean(mse_train),
+            }
+        )
+    log.flush()
 
     return np.mean(nll_train)
 
@@ -280,9 +289,9 @@ def train(epoch):
 t_total = time.time()
 run = wandb.init(project="mldyn", entity="vbhethan")
 for epoch in range(args.epochs):
-    train_loss = train(epoch)
+    train_loss = train(epoch, wandbrun=run)
     print("Finished with epoch: ", epoch)
-    run.log({"train/train_loss": train_loss, "epoch": epoch})
+    run.log({"epoch": epoch})
 
 print("Optimization Finished!")
 
