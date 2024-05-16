@@ -12,8 +12,8 @@ import numpy as np
 import torch
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from torch.autograd import Variable
 import torch.nn.functional as F
+import wandb
 
 from mldyn.layers.layers import MLPEncoder, MLPDecoder
 from mldyn.utils import (
@@ -278,9 +278,11 @@ def train(epoch):
 
 # Train model
 t_total = time.time()
+run = wandb.init(project="mldyn", entity="vbhethan")
 for epoch in range(args.epochs):
     train_loss = train(epoch)
     print("Finished with epoch: ", epoch)
+    run.log({"train/train_loss": train_loss, "epoch": epoch})
 
 print("Optimization Finished!")
 
