@@ -9,10 +9,10 @@ from torch.autograd import Variable
 
 class MLP(nn.Module):
 
-    def __init__(self, n_in, n_hid, n_out, do_prob=0.):
+    def __init__(self, n_in, n_hid, n_out, do_prob=0.0):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(n_in, n_hid)
-        self.fc2 = nn.Linear(n_hid, n_out) 
+        self.fc2 = nn.Linear(n_hid, n_out)
         self.bn = nn.BatchNorm1d(n_out)
         self.dropout_prob = do_prob
 
@@ -31,16 +31,17 @@ class MLP(nn.Module):
         x = inputs.view(inputs.size(0) * inputs.size(1), -1)
         x = self.bn(x)
         return x.view(inputs.size(0), inputs.size(1), -1)
-    
+
     def forward(self, x):
         x = F.elu(self.fc1(x))
         x = F.dropout(x, self.dropout_prob, training=self.training)
-        x = F.elu(self.fc2(x)) 
+        x = F.elu(self.fc2(x))
         return self.batch_norm(x)
-        
+
+
 class MLPEncoder(nn.Module):
 
-    def __init__(self, n_in, n_hid, n_out, do_prob=0.):
+    def __init__(self, n_in, n_hid, n_out, do_prob=0.0):
         super(MLPEncoder, self).__init__()
 
         self.mlp1 = MLP(n_in, n_hid, n_hid, do_prob)
@@ -59,18 +60,23 @@ class MLPEncoder(nn.Module):
             elif isinstance(m, nn.BatchNorm1d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-    
+
     def edge2node(self, x, rel_rec, rel_send):
         incoming = torch.matmul(rel_rec.t(), x)
         return incoming / incoming.size(1)
-    
+
     def node2edge(self, x, rel_rec, rel_send):
         send = torch.matmul(rel_send, x)
         rec = torch.matmul(rel_rec, x)
         edges = torch.cat([send, rec], dim=2)
         return edges
-    
+
     def forward(self, inputs, rel_rec, rel_send):
+
+        device = inputs.device
+        inputs = inputs.to(device)
+        rel_rec = rel_rec.to(device)
+        rel_send = rel_send.to(device)
         # Inputs will have shape [num_sims, num_particles, num_timesteps, num_dims]
         x = inputs.view(inputs.size(0), inputs.size(1), -1)
         # New shape [num_sims, num_particles, num_timesteps * num_dims]
@@ -79,7 +85,7 @@ class MLPEncoder(nn.Module):
         x = self.mlp2(x)
         x_skip = x
 
-        # Implement the factor graph to start 
+        # Implement the factor graph to start
         x = self.edge2node(x, rel_rec, rel_send)
         x = self.mlp3(x)
         x = self.node2edge(x, rel_rec, rel_send)
@@ -90,7 +96,16 @@ class MLPEncoder(nn.Module):
 
 
 class MLPDecoder(nn.Module):
-    def __init__(self, n_in_node, edge_types, msg_hid, msg_out, n_hid, do_prob=0., skip_first=False):
+    def __init__(
+        self,
+        n_in_node,
+        edge_types,
+        msg_hid,
+        msg_out,
+        n_hid,
+        do_prob=0.0,
+        skip_first=False,
+    ):
         super(MLPDecoder, self).__init__()
         self.msg_fc1 = nn.ModuleList(
             [nn.Linear(2 * n_in_node, msg_hid) for _ in range(edge_types)]
@@ -107,7 +122,9 @@ class MLPDecoder(nn.Module):
 
         self.dropout_prob = do_prob
 
-    def single_step_forward(self, single_timestep_inputs, rel_rec, rel_send, single_timestep_rel_type):
+    def single_step_forward(
+        self, single_timestep_inputs, rel_rec, rel_send, single_timestep_rel_type
+    ):
         # single_timesteps_inputs has shape [batch_size, num_timesteps, num_particles, num_dims]
         # single_timestep_rel_type has shape [batch_size, num_timesteps, num_particles*(num_particles-1), num_edge_types]
 
@@ -115,25 +132,26 @@ class MLPDecoder(nn.Module):
         senders = torch.matmul(rel_send, single_timestep_inputs)
         pre_msg = torch.cat([receivers, senders], dim=-1)
 
-        all_msgs = torch.zeros(pre_msg.size(0), pre_msg.size(1),
-                               pre_msg.size(2), self.msg_out_shape)
-        
+        all_msgs = torch.zeros(
+            pre_msg.size(0), pre_msg.size(1), pre_msg.size(2), self.msg_out_shape
+        )
+
         if single_timestep_inputs.is_cuda:
             all_msgs = all_msgs.cuda()
-        
+
         if self.skip_first_edge_type:
             start_idx = 1
         else:
             start_idx = 0
-        
+
         for i in range(start_idx, len(self.msg_fc2)):
             msg = F.relu(self.msg_fc1[i](pre_msg))
             msg = F.dropout(msg, p=self.dropout_prob)
             msg = F.relu(self.msg_fc2[i](msg))
-            msg = msg * single_timestep_rel_type[:, :, :, i:i + 1]
+            msg = msg * single_timestep_rel_type[:, :, :, i : i + 1]
             all_msgs += msg
 
-        agg_msgs = all_msgs.transpose(-2,-1).matmul(rel_rec).transpose(-2,-1)
+        agg_msgs = all_msgs.transpose(-2, -1).matmul(rel_rec).transpose(-2, -1)
         agg_msgs = agg_msgs.contiguous()
 
         # Concatenates the inputs to make the skip connection
@@ -143,8 +161,8 @@ class MLPDecoder(nn.Module):
         pred = F.dropout(F.relu(self.out_fc2(pred)), p=self.dropout_prob)
         pred = self.out_fc3(pred)
 
-        return single_timestep_inputs + pred 
-    
+        return single_timestep_inputs + pred
+
     def forward(self, inputs, rel_type, rel_rec, rel_send, pred_steps=1):
         inputs = inputs.transpose(1, 2).contiguous()
         # print("inputs shape after transpose", inputs.shape)
@@ -153,28 +171,35 @@ class MLPDecoder(nn.Module):
         rel_type = rel_type.unsqueeze(1).expand(sizes)
 
         time_steps = inputs.size(1)
-        assert(pred_steps <= time_steps)
+        assert pred_steps <= time_steps
         preds = []
 
-        last_pred = inputs[:,0::pred_steps, :, :]
+        last_pred = inputs[:, 0::pred_steps, :, :]
         # print("last_pred shape", last_pred.shape)
-        curr_rel_type = rel_type[:,0::pred_steps, :, :]
+        curr_rel_type = rel_type[:, 0::pred_steps, :, :]
 
         for step in range(0, pred_steps):
-            last_pred = self.single_step_forward(last_pred, rel_rec, rel_send, curr_rel_type)
+            last_pred = self.single_step_forward(
+                last_pred, rel_rec, rel_send, curr_rel_type
+            )
             preds.append(last_pred)
 
         # print("preds[0]: ", preds[0])
-        sizes = [preds[0].size(0), preds[0].size(1)*pred_steps, preds[0].size(2), preds[0].size(3)]
-        
+        sizes = [
+            preds[0].size(0),
+            preds[0].size(1) * pred_steps,
+            preds[0].size(2),
+            preds[0].size(3),
+        ]
+
         output = Variable(torch.zeros(sizes))
 
         if inputs.is_cuda:
             output = output.cuda()
-        
+
         for i in range(len(preds)):
             output[:, i::pred_steps, :, :] = preds[i]
 
-        pred_all = output[:, :(inputs.size(1) - 1), :, :]
+        pred_all = output[:, : (inputs.size(1) - 1), :, :]
 
-        return pred_all.transpose(1,2).contiguous()
+        return pred_all.transpose(1, 2).contiguous()
