@@ -153,7 +153,7 @@ else:
 
 
 train_loader, loc_max, loc_min = load_data(
-    args.datafile_basename, batch_size=1, data_dir=args.data_dir
+    args.datafile_basename, batch_size=8, data_dir=args.data_dir
 )
 
 off_diag = np.ones([args.num_atoms, args.num_atoms]) - np.eye(args.num_atoms)
