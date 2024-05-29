@@ -73,3 +73,5 @@ working*
 
 # Logs
 logs
+wandb
+slurm-*.out
