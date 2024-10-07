@@ -13,7 +13,9 @@ def generate_ca_cb_indices(u: mda.Universe):
     """
     ca_indices = []
     cb_indices = []
-    for residue in u.residues:
+    protein_selection = u.select_atoms("protein")
+
+    for residue in protein_selection.residues:
         if residue.resname == "GLY":
             ca_indices.append(residue.atoms.select_atoms("name CA").indices[0])
             cb_indices.append(residue.atoms.select_atoms("name HA1").indices[0])
