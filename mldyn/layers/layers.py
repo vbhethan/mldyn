@@ -14,18 +14,18 @@ class SelfAttentionLayer(nn.Module):
         - output: output tensor of shape (batch_size, sequence_length, embedding_dimension)
     """
 
-    def __init__(self, input_dimension, attention_dimension):
+    def __init__(self, input_dimension, embed_size):
         super(SelfAttentionLayer, self).__init__()
         self.input_dimension = input_dimension
-        self.attention_dimension = attention_dimension
+        self.embed_size = embed_size
 
         # Query, Key, Value linear layers
-        self.query = nn.Linear(input_dimension, attention_dimension)
-        self.key = nn.Linear(input_dimension, attention_dimension)
-        self.value = nn.Linear(input_dimension, attention_dimension)
+        self.query = nn.Linear(input_dimension, embed_size)
+        self.key = nn.Linear(input_dimension, embed_size)
+        self.value = nn.Linear(input_dimension, embed_size)
 
         # Output linear layer
-        self.fc_out = nn.Linear(attention_dimension, input_dimension)
+        self.fc_out = nn.Linear(embed_size, input_dimension)
 
     def forward(self, x):
 
@@ -157,9 +157,7 @@ class CrossAttentionLayer(nn.Module):
         V = self.value(value)
 
         # Compute attention scores
-        attention_scores = torch.matmul(
-            Q, K.transpose(-2, -1) / torch.sqrt(self.d_model, dtype=torch.float32)
-        )
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1) / (self.d_model**0.5))
 
         # Softmax for weights
         attention_weights = F.softmax(attention_scores, dim=-1)
