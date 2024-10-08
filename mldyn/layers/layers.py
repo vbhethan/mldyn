@@ -1,205 +1,199 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torch.autograd import Variable
-
-# See https://github.com/ethanfetaya/NRI/ and https://github.com/loeweX/AmortizedCausalDiscovery/
+import math
 
 
-class MLP(nn.Module):
+class SelfAttentionLayer(nn.Module):
+    """
+    Implement the self-attention layer
+    Input:
+        - x: input tensor of shape (batch_size, sequence_length, input_dimension)
 
-    def __init__(self, n_in, n_hid, n_out, do_prob=0.0):
-        super(MLP, self).__init__()
-        self.fc1 = nn.Linear(n_in, n_hid)
-        self.fc2 = nn.Linear(n_hid, n_out)
-        self.bn = nn.BatchNorm1d(n_out)
-        self.dropout_prob = do_prob
+    Output:
+        - output: output tensor of shape (batch_size, sequence_length, embedding_dimension)
+    """
 
-        self.init_weights()
+    def __init__(self, input_dimension, attention_dimension):
+        super(SelfAttentionLayer, self).__init__()
+        self.input_dimension = input_dimension
+        self.attention_dimension = attention_dimension
 
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight.data)
-                m.bias.data.fill_(0.1)
-            elif isinstance(m, nn.BatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+        # Query, Key, Value linear layers
+        self.query = nn.Linear(input_dimension, attention_dimension)
+        self.key = nn.Linear(input_dimension, attention_dimension)
+        self.value = nn.Linear(input_dimension, attention_dimension)
 
-    def batch_norm(self, inputs):
-        x = inputs.view(inputs.size(0) * inputs.size(1), -1)
-        x = self.bn(x)
-        return x.view(inputs.size(0), inputs.size(1), -1)
+        # Output linear layer
+        self.fc_out = nn.Linear(attention_dimension, input_dimension)
 
     def forward(self, x):
-        x = F.elu(self.fc1(x))
-        x = F.dropout(x, self.dropout_prob, training=self.training)
-        x = F.elu(self.fc2(x))
-        return self.batch_norm(x)
+
+        # Compute the query, key, value tensors
+        q = self.query(x)
+        k = self.key(x)
+        v = self.value(x)
+
+        # Compute the attention scores (Shape will be #TODO: check)
+        attention_scores = torch.matmul(q, k.transpose(-2, -1) / self.embed_size**0.5)
+        # Apply softmax to compute the attention weights
+        attention_weights = F.softmax(attention_scores, dim=-1)
+
+        # Compute the output tensor
+        out = torch.matmul(attention_weights, v)
+        out = self.fc_out(out)
+
+        return out
 
 
-class MLPEncoder(nn.Module):
+class FeedForward(nn.Module):
+    """
+    Feed forward neural network for the transformer encoder
+    """
 
-    def __init__(self, n_in, n_hid, n_out, do_prob=0.0):
-        super(MLPEncoder, self).__init__()
+    def __init__(self, d_model, d_ff, dropout=0.0):
+        super(FeedForward, self).__init__()
+        self.linear1 = nn.Linear(d_model, d_ff)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(d_ff, d_model)
+        self.activation = nn.ReLU()
 
-        self.mlp1 = MLP(n_in, n_hid, n_hid, do_prob)
-        self.mlp2 = MLP(n_hid * 2, n_hid, n_hid, do_prob)
-        self.mlp3 = MLP(n_hid, n_hid, n_hid, do_prob)
-        self.mlp4 = MLP(n_hid * 3, n_hid, n_hid, do_prob)
-
-        self.fc_out = nn.Linear(n_hid, n_out)
-        self.init_weights()
-
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight.data)
-                m.bias.data.fill_(0.1)
-            elif isinstance(m, nn.BatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-
-    def edge2node(self, x, rel_rec, rel_send):
-        incoming = torch.matmul(rel_rec.t(), x)
-        return incoming / incoming.size(1)
-
-    def node2edge(self, x, rel_rec, rel_send):
-        send = torch.matmul(rel_send, x)
-        rec = torch.matmul(rel_rec, x)
-        edges = torch.cat([send, rec], dim=2)
-        return edges
-
-    def forward(self, inputs, rel_rec, rel_send):
-
-        device = inputs.device
-        inputs = inputs.to(device)
-        rel_rec = rel_rec.to(device)
-        rel_send = rel_send.to(device)
-        # Inputs will have shape [num_sims, num_particles, num_timesteps, num_dims]
-        x = inputs.view(inputs.size(0), inputs.size(1), -1)
-        # New shape [num_sims, num_particles, num_timesteps * num_dims]
-        x = self.mlp1(x)
-        x = self.node2edge(x, rel_rec, rel_send)
-        x = self.mlp2(x)
-        x_skip = x
-
-        # Implement the factor graph to start
-        x = self.edge2node(x, rel_rec, rel_send)
-        x = self.mlp3(x)
-        x = self.node2edge(x, rel_rec, rel_send)
-        x = torch.cat([x, x_skip], dim=2)
-        x = self.mlp4(x)
-
-        return self.fc_out(x)
+    def forward(self, x):
+        return self.linear2(self.dropout(self.activation(self.linear1(x))))
 
 
-class MLPDecoder(nn.Module):
-    def __init__(
-        self,
-        n_in_node,
-        edge_types,
-        msg_hid,
-        msg_out,
-        n_hid,
-        do_prob=0.0,
-        skip_first=False,
-    ):
-        super(MLPDecoder, self).__init__()
-        self.msg_fc1 = nn.ModuleList(
-            [nn.Linear(2 * n_in_node, msg_hid) for _ in range(edge_types)]
+class EncoderLayer(nn.Module):
+    """
+    Composition of the self-attention layer and feed forward neural network for an encoder layer
+    """
+
+    def __init__(self, d_model, d_ff, dropout=0.0):
+        super(EncoderLayer, self).__init__()
+        self.self_attention = SelfAttentionLayer(d_model, d_model)
+        self.feed_forward = FeedForward(d_model, d_ff, dropout)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        # Self Attention
+        attention_output = self.self_attention(x)
+        x = self.norm1(x + self.dropout(attention_output))
+
+        # Feed Forward
+        ff_output = self.feed_forward(x)
+        x = self.norm2(x + self.dropout(ff_output))
+
+        return x
+
+
+class ResidueEmbeddingLayer(nn.Module):
+
+    def __init__(self, n_particles, input_state_dimension, d_model, n_particle_types):
+        super(ResidueEmbeddingLayer, self).__init__()
+        self.n_particles = n_particles
+        self.d_model = d_model
+        self.n_particle_types = n_particle_types
+
+        # Particle State Embedding
+        self.state_embedding = nn.Embedding(input_state_dimension, d_model)
+
+        # Positional Embedding
+        self.pos_encoding = self.create_positional_encoding()
+
+        # Particle Type Embedding
+        self.type_embedding = nn.Embedding(n_particle_types, d_model)
+
+    def create_positional_encoding(self):
+        pos_encoding = torch.zeros(self.n_particles, self.d_model)
+        position = torch.arange(0, self.n_particles, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, self.d_model, 2).float()
+            * (-math.log(10000.0) / self.d_model)
+        )  # Formula / values from the Attention is all you need paper...
+        pos_encoding[:, 0::2] = torch.sin(position * div_term)
+        pos_encoding[:, 1::2] = torch.cos(position * div_term)
+        return pos_encoding.unsqueeze(0)
+
+    def forward(self, particle_states, particle_types):
+        # Particle states shape: (batch_size, n_particles, input_state_dimension)
+        # Particle types shape: (batch_size, n_particles)
+
+        batch_size = particle_states.shape[0]
+
+        # Embed the particle states
+        state_embedding = self.state_embedding(particle_states)
+
+        # Add the positional encoding
+        positional_encoding = self.pos_encoding.repeat(batch_size, 1, 1).to(
+            particle_states.device
         )
-        self.msg_fc2 = nn.ModuleList(
-            [nn.Linear(msg_hid, msg_out) for _ in range(edge_types)]
+        state_position_embedding = state_embedding + positional_encoding
+
+        # Embed the particle types
+        type_embedding = self.type_embedding(particle_types)
+
+        # Combine the embeddings
+        residue_embedding = state_position_embedding + type_embedding
+
+        return residue_embedding
+
+
+class CrossAttentionLayer(nn.Module):
+    def __init__(self, d_model):
+        super(CrossAttentionLayer, self).__init__()
+        self.d_model = d_model
+
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+
+        self.fc_out = nn.Linear(d_model, d_model)
+
+    def forward(self, query, key, value):
+        # Linear Transforms
+        Q = self.query(query)
+        K = self.key(key)
+        V = self.value(value)
+
+        # Compute attention scores
+        attention_scores = torch.matmul(
+            Q, K.transpose(-2, -1) / torch.sqrt(self.d_model, dtype=torch.float32)
         )
-        self.msg_out_shape = msg_out
-        self.skip_first_edge_type = skip_first
 
-        self.out_fc1 = nn.Linear(n_in_node + msg_out, n_hid)
-        self.out_fc2 = nn.Linear(n_hid, n_hid)
-        self.out_fc3 = nn.Linear(n_hid, n_in_node)
+        # Softmax for weights
+        attention_weights = F.softmax(attention_scores, dim=-1)
 
-        self.dropout_prob = do_prob
+        output = torch.matmul(attention_weights, V)
+        output = self.fc_out(output)
 
-    def single_step_forward(
-        self, single_timestep_inputs, rel_rec, rel_send, single_timestep_rel_type
-    ):
-        # single_timesteps_inputs has shape [batch_size, num_timesteps, num_particles, num_dims]
-        # single_timestep_rel_type has shape [batch_size, num_timesteps, num_particles*(num_particles-1), num_edge_types]
+        return output
 
-        receivers = torch.matmul(rel_rec, single_timestep_inputs)
-        senders = torch.matmul(rel_send, single_timestep_inputs)
-        pre_msg = torch.cat([receivers, senders], dim=-1)
 
-        all_msgs = torch.zeros(
-            pre_msg.size(0), pre_msg.size(1), pre_msg.size(2), self.msg_out_shape
-        )
+class DecoderLayer(nn.Module):
 
-        if single_timestep_inputs.is_cuda:
-            all_msgs = all_msgs.cuda()
+    def __init__(self, d_model, d_feedforward, dropout=0.0):
+        super(DecoderLayer, self).__init__()
+        self.self_attention = SelfAttentionLayer(d_model, d_model)
+        self.cross_attention = CrossAttentionLayer(d_model)
+        self.feed_forward = FeedForward(d_model, d_feedforward, dropout)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
 
-        if self.skip_first_edge_type:
-            start_idx = 1
-        else:
-            start_idx = 0
+    def forward(self, target, memory):
 
-        for i in range(start_idx, len(self.msg_fc2)):
-            msg = F.relu(self.msg_fc1[i](pre_msg))
-            msg = F.dropout(msg, p=self.dropout_prob)
-            msg = F.relu(self.msg_fc2[i](msg))
-            msg = msg * single_timestep_rel_type[:, :, :, i : i + 1]
-            all_msgs += msg
+        # Self Attention
+        target2 = self.norm1(target)
+        target = target + self.dropout(self.self_attention(target2))
 
-        agg_msgs = all_msgs.transpose(-2, -1).matmul(rel_rec).transpose(-2, -1)
-        agg_msgs = agg_msgs.contiguous()
+        # Cross attention of target with the memory from the encoder output
+        target2 = self.norm2(target)
+        target = target + self.dropout(self.cross_attention(target2, memory, memory))
 
-        # Concatenates the inputs to make the skip connection
-        aug_inputs = torch.cat([single_timestep_inputs, agg_msgs], dim=-1)
+        # Feed Forward NN
+        target2 = self.norm3(target)
+        target = target + self.dropout(self.feed_forward(target2))
 
-        pred = F.dropout(F.relu(self.out_fc1(aug_inputs)), p=self.dropout_prob)
-        pred = F.dropout(F.relu(self.out_fc2(pred)), p=self.dropout_prob)
-        pred = self.out_fc3(pred)
-
-        return single_timestep_inputs + pred
-
-    def forward(self, inputs, rel_type, rel_rec, rel_send, pred_steps=1):
-        inputs = inputs.transpose(1, 2).contiguous()
-        # print("inputs shape after transpose", inputs.shape)
-
-        sizes = [rel_type.size(0), inputs.size(1), rel_type.size(1), rel_type.size(2)]
-        rel_type = rel_type.unsqueeze(1).expand(sizes)
-
-        time_steps = inputs.size(1)
-        assert pred_steps <= time_steps
-        preds = []
-
-        last_pred = inputs[:, 0::pred_steps, :, :]
-        # print("last_pred shape", last_pred.shape)
-        curr_rel_type = rel_type[:, 0::pred_steps, :, :]
-
-        for step in range(0, pred_steps):
-            last_pred = self.single_step_forward(
-                last_pred, rel_rec, rel_send, curr_rel_type
-            )
-            preds.append(last_pred)
-
-        # print("preds[0]: ", preds[0])
-        sizes = [
-            preds[0].size(0),
-            preds[0].size(1) * pred_steps,
-            preds[0].size(2),
-            preds[0].size(3),
-        ]
-
-        output = Variable(torch.zeros(sizes))
-
-        if inputs.is_cuda:
-            output = output.cuda()
-
-        for i in range(len(preds)):
-            output[:, i::pred_steps, :, :] = preds[i]
-
-        pred_all = output[:, : (inputs.size(1) - 1), :, :]
-
-        return pred_all.transpose(1, 2).contiguous()
+        return target
