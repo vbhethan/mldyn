@@ -96,7 +96,7 @@ class ResidueEmbeddingLayer(nn.Module):
         self.n_particle_types = n_particle_types
 
         # Particle State Embedding
-        self.state_embedding = nn.Embedding(input_state_dimension, d_model)
+        self.state_embedding = nn.Linear(input_state_dimension, d_model)
 
         # Positional Embedding
         self.pos_encoding = self.create_positional_encoding()
