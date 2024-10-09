@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 
 from mldyn.models.transformer import TransformerTimeSeriesModel
 from mldyn.data.dataloaders import create_dataloader
+from mldyn.loss import CustomMSELoss
 
 
 def train(model, dataloader, optimizer, criterion, device, clip_value=1.0):
@@ -21,9 +22,7 @@ def train(model, dataloader, optimizer, criterion, device, clip_value=1.0):
 
         predictions = model(initial_condition, particle_labels)
 
-        loss = sum(
-            [criterion(pred, target) for pred, target in zip(predictions, targets)]
-        )
+        loss = criterion(predictions, targets)
 
         loss.backward()
 
@@ -96,7 +95,7 @@ def main():
         train_data_path, particle_identities_path, batch_size
     )
 
-    criterion = nn.MSELoss()
+    criterion = CustomMSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     for epoch in range(num_epochs):
