@@ -13,5 +13,5 @@ class CustomMSELoss(nn.Module):
         total_loss = 0
         for t, pred in enumerate(predictions):
             target = targets[:, t, :, :]
-            total_loss += self.mse(pred, targets)
+            total_loss += self.mse(pred, target)
         return total_loss / len(predictions)
