@@ -85,3 +85,34 @@ class TransformerTimeSeriesModel(nn.Module):
             predictions.append(prediction)
 
         return predictions
+
+
+# Example usage
+if __name__ == "__main__":
+    n_particles = 100
+    input_state_dimension = 6
+    d_model = 128
+    n_particle_types = 20
+    n_time_steps = 19
+    d_feedforward = 256
+    batch_size = 4
+
+    model = TransformerTimeSeriesModel(
+        n_particles,
+        input_state_dimension,
+        d_model,
+        n_particle_types,
+        n_time_steps,
+        d_feedforward,
+    )
+
+    print(
+        f"Number of parameters in the model: {sum(p.numel() for p in model.parameters())}"
+    )
+
+    initial_condition = torch.randn(batch_size, n_particles, input_state_dimension)
+    particle_types = torch.randint(0, n_particle_types, (batch_size, n_particles))
+
+    predictions = model(initial_condition, particle_types)
+    print(f"Number of predictions: {len(predictions)}")
+    print(f"Shape of each prediction: {predictions[0].shape}")
