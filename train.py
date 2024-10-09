@@ -65,7 +65,7 @@ def main():
     input_state_dimension = 6
     d_model = 128
     n_particle_types = 20
-    n_time_steps = 20
+    n_time_steps = 19
     d_feedforward = 256
 
     num_epochs = 100
@@ -74,7 +74,7 @@ def main():
     batch_size = 4
 
     # Paths to datafiles
-    train_data_path = "./train_data.npy"
+    train_data_path = "./sim_data/train_data.npy"
     particle_identities_path = "particle_identities.txt"
     val_data_path = "./val_data.npy"
 

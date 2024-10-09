@@ -9,8 +9,9 @@ class CustomMSELoss(nn.Module):
 
     def forward(self, predictions, targets):
         # predictions: list of tensors, each of shape (batch_size, n_particles, input_state_dimension)
-        # targets: tensor of shape (n_time_steps, batch_size, n_particles, input_state_dimension)
+        # targets: tensor of shape (batch_size, n_timesteps, n_particles, input_state_dimension)
         total_loss = 0
         for t, pred in enumerate(predictions):
-            total_loss += self.mse(pred, targets[t])
+            target = targets[:, t, :, :]
+            total_loss += self.mse(pred, targets)
         return total_loss / len(predictions)
