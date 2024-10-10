@@ -34,7 +34,7 @@ class SelfAttentionLayer(nn.Module):
         k = self.key(x)
         v = self.value(x)
 
-        # Compute the attention scores (Shape will be #TODO: check)
+        # Compute the attention scores (Shape will be (N_particles, N_particles))
         attention_scores = torch.matmul(q, k.transpose(-2, -1) / self.embed_size**0.5)
         # Apply softmax to compute the attention weights
         attention_weights = F.softmax(attention_scores, dim=-1)
