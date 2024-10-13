@@ -196,4 +196,4 @@ class PostProcessDecoderLayer(nn.Module):
         target2 = self.norm3(target)
         target = target + self.dropout(self.feed_forward(target2))
 
-        return target, self_attention_weights
+        return target, self_attention_weights, cross_attention_weights
