@@ -19,10 +19,7 @@ def load_trained_model(model_path, model):
 
 def prepare_input_data(data_path, particle_identities_path):
     dataset = TimeSeriesDataset(data_path, particle_identities_path)
-    initial_conditions, _, particle_labels = dataset
-    # Could use a batch or index sampling, but for postprocessing I think I will randomly sample initial conditions and store in a separate file
-    initial_conditions = torch.tensor(initial_conditions, dtype=torch.float32)
-    return initial_conditions, particle_labels
+    return dataset
 
 
 def extract_attention_maps(model, initial_condition, particle_labels):
