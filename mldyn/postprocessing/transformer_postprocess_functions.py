@@ -17,7 +17,7 @@ def load_trained_model(model_path, model):
     return model
 
 
-def prepare_input_data(data_path, particle_identities_path):
+def prepare_input_data(data_path, particle_identities_path, device):
     dataset = TimeSeriesDataset(data_path, particle_identities_path)
     return dataset
 
@@ -25,6 +25,9 @@ def prepare_input_data(data_path, particle_identities_path):
 def extract_attention_maps(model, initial_condition, particle_labels):
     model.eval()
     with torch.no_grad():
+        device = next(model.parameters()).device
+        initial_condition = initial_condition.to(device)
+        particle_labels = particle_labels.to(device)
         (
             predictions,
             encoder_attention_maps,
@@ -32,6 +35,11 @@ def extract_attention_maps(model, initial_condition, particle_labels):
             decoder_cross_attention_maps,
         ) = model(initial_condition, particle_labels)
 
+    # Convert attention maps to numpy arrays after moving them to CPU
+    encoder_attention_maps = [attn.cpu().numpy() for attn in encoder_attention_maps]
+    decoder_self_attention_maps = [attn.cpu().numpy() for attn in decoder_self_attention_maps]
+    decoder_cross_attention_maps = [attn.cpu().numpy() for attn in decoder_cross_attention_maps]
+        
     # The attention maps will have shape (t_steps, batch_size, n_particles, n_particles)
     # We will aggregate the attention maps across the batch dimension (for batch size 1 this just drops the batch dimension)
     encoder_attention_maps = np.mean(np.stack(encoder_attention_maps), axis=1)
