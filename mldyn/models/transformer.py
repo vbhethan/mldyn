@@ -5,8 +5,6 @@ import torch.nn.functional as F
 from typing import List
 
 from mldyn.layers.layers import (
-    SelfAttentionLayer,
-    FeedForward,
     EncoderLayer,
     DecoderLayer,
     ResidueEmbeddingLayer,
@@ -31,6 +29,7 @@ class TransformerTimeSeriesModel(nn.Module):
         n_time_steps: int,
         d_feedforward: int,
         dropout: float = 0.0,
+        num_heads: int = 4,
     ):
         super(TransformerTimeSeriesModel, self).__init__()
         self.n_time_steps = n_time_steps
@@ -41,11 +40,17 @@ class TransformerTimeSeriesModel(nn.Module):
 
         # Create separate encoder and decoder for each time step
         self.encoders = nn.ModuleList(
-            [EncoderLayer(d_model, d_feedforward, dropout) for _ in range(n_time_steps)]
+            [
+                EncoderLayer(d_model, d_feedforward, dropout, num_heads=num_heads)
+                for _ in range(n_time_steps)
+            ]
         )
 
         self.decoders = nn.ModuleList(
-            [DecoderLayer(d_model, d_feedforward, dropout) for _ in range(n_time_steps)]
+            [
+                DecoderLayer(d_model, d_feedforward, dropout, num_heads=num_heads)
+                for _ in range(n_time_steps)
+            ]
         )
 
         self.final_layers = nn.ModuleList(
@@ -70,19 +75,15 @@ class TransformerTimeSeriesModel(nn.Module):
             # Encode z from x
             z = self.encoders[t](x)
 
-            # For the first step use the initial condition as the target
-            # For subsequent steps use the previous prediction
-            target = (
+            decoder_input = (
                 x if t == 0 else self.residue_embedding(predictions[-1], particle_types)
             )
 
-            # Decode
-            output = self.decoders[t](z, target)
+            # z is the memory, decoder_input is what will attend to it
+            output = self.decoders[t](decoder_input, z)
 
-            # Project to the input state dimension
-            prediction = self.final_layers[t](output)
-
-            predictions.append(prediction)
+            # This output is what we're trying to predict
+            predictions.append(output)
 
         return predictions
 

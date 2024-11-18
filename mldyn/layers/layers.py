@@ -4,20 +4,29 @@ import torch.nn.functional as F
 import math
 
 
-class SelfAttentionLayer(nn.Module):
+class AttentionLayer(nn.Module):
     """
-    Implement the self-attention layer
+    Unified attention layer that can handle both self-attention and cross-attention
+
+    For self-attention: pass the same tensor as query, key, and value
+    For cross-attention: pass different tensors for query vs key/value
+
     Input:
-        - x: input tensor of shape (batch_size, sequence_length, input_dimension)
+        - query: tensor of shape (batch_size, query_length, input_dimension)
+        - key: tensor of shape (batch_size, key_length, input_dimension)
+        - value: tensor of shape (batch_size, key_length, input_dimension)
 
     Output:
-        - output: output tensor of shape (batch_size, sequence_length, embedding_dimension)
+        - output: tensor of shape (batch_size, query_length, input_dimension)
     """
 
-    def __init__(self, input_dimension, embed_size):
-        super(SelfAttentionLayer, self).__init__()
+    def __init__(self, input_dimension, embed_size, num_heads=8):
+        super(AttentionLayer, self).__init__()
         self.input_dimension = input_dimension
         self.embed_size = embed_size
+        self.num_heads = num_heads
+        assert embed_size % num_heads == 0, "embed_size must be divisible by num_heads"
+        self.head_dim = embed_size // num_heads
 
         # Query, Key, Value linear layers
         self.query = nn.Linear(input_dimension, embed_size)
@@ -27,20 +36,49 @@ class SelfAttentionLayer(nn.Module):
         # Output linear layer
         self.fc_out = nn.Linear(embed_size, input_dimension)
 
-    def forward(self, x):
+    def forward(self, query, key=None, value=None):
+        # If key is None, use query (self-attention case)
+        if key is None:
+            key = query
+        # If value is None, use key (ensures value matches key source)
+        if value is None:
+            value = key
 
-        # Compute the query, key, value tensors
-        q = self.query(x)
-        k = self.key(x)
-        v = self.value(x)
+        batch_size = query.shape[0]
+        query_length = query.shape[1]
+        key_length = key.shape[1]
 
-        # Compute the attention scores (Shape will be (N_particles, N_particles))
-        attention_scores = torch.matmul(q, k.transpose(-2, -1) / self.embed_size**0.5)
-        # Apply softmax to compute the attention weights
+        # Compute query, key, value and split into heads
+        q = self.query(query).view(
+            batch_size, query_length, self.num_heads, self.head_dim
+        )
+        k = self.key(key).view(batch_size, key_length, self.num_heads, self.head_dim)
+        v = self.value(value).view(
+            batch_size, key_length, self.num_heads, self.head_dim
+        )
+
+        # Transpose to get dimensions: (batch_size, num_heads, seq_length, head_dim)
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
+
+        # Compute attention scores for all heads simultaneously
+        attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim**0.5)
         attention_weights = F.softmax(attention_scores, dim=-1)
 
-        # Compute the output tensor
-        out = torch.matmul(attention_weights, v)
+        # Apply attention weights to values
+        out = torch.matmul(
+            attention_weights, v
+        )  # (batch_size, num_heads, query_length, head_dim)
+
+        # Reshape back: (batch_size, query_length, embed_size)
+        out = (
+            out.transpose(1, 2)
+            .contiguous()
+            .view(batch_size, query_length, self.embed_size)
+        )
+
+        # Final linear projection
         out = self.fc_out(out)
 
         return out
@@ -63,26 +101,24 @@ class FeedForward(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    """
-    Composition of the self-attention layer and feed forward neural network for an encoder layer
-    """
+    """Encoder layer that uses self-attention"""
 
-    def __init__(self, d_model, d_ff, dropout=0.0):
+    def __init__(self, d_model, d_feedforward, dropout=0.0, num_heads=8):
         super(EncoderLayer, self).__init__()
-        self.self_attention = SelfAttentionLayer(d_model, d_model)
-        self.feed_forward = FeedForward(d_model, d_ff, dropout)
+        self.attention = AttentionLayer(d_model, d_model, num_heads=num_heads)
+        self.feed_forward = FeedForward(d_model, d_feedforward, dropout)
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         # Self Attention
-        attention_output = self.self_attention(x)
-        x = self.norm1(x + self.dropout(attention_output))
+        x2 = self.norm1(x)
+        x = x + self.dropout(self.attention(x2))
 
         # Feed Forward
-        ff_output = self.feed_forward(x)
-        x = self.norm2(x + self.dropout(ff_output))
+        x2 = self.norm2(x)
+        x = x + self.dropout(self.feed_forward(x2))
 
         return x
 
@@ -139,41 +175,13 @@ class ResidueEmbeddingLayer(nn.Module):
         return residue_embedding
 
 
-class CrossAttentionLayer(nn.Module):
-    def __init__(self, d_model):
-        super(CrossAttentionLayer, self).__init__()
-        self.d_model = d_model
-
-        self.query = nn.Linear(d_model, d_model)
-        self.key = nn.Linear(d_model, d_model)
-        self.value = nn.Linear(d_model, d_model)
-
-        self.fc_out = nn.Linear(d_model, d_model)
-
-    def forward(self, query, key, value):
-        # Linear Transforms
-        Q = self.query(query)
-        K = self.key(key)
-        V = self.value(value)
-
-        # Compute attention scores
-        attention_scores = torch.matmul(Q, K.transpose(-2, -1) / (self.d_model**0.5))
-
-        # Softmax for weights
-        attention_weights = F.softmax(attention_scores, dim=-1)
-
-        output = torch.matmul(attention_weights, V)
-        output = self.fc_out(output)
-
-        return output
-
-
 class DecoderLayer(nn.Module):
+    """Decoder layer with self-attention and cross-attention"""
 
-    def __init__(self, d_model, d_feedforward, dropout=0.0):
+    def __init__(self, d_model, d_feedforward, dropout=0.0, num_heads=8):
         super(DecoderLayer, self).__init__()
-        self.self_attention = SelfAttentionLayer(d_model, d_model)
-        self.cross_attention = CrossAttentionLayer(d_model)
+        self.self_attention = AttentionLayer(d_model, d_model, num_heads=num_heads)
+        self.cross_attention = AttentionLayer(d_model, d_model, num_heads=num_heads)
         self.feed_forward = FeedForward(d_model, d_feedforward, dropout)
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
@@ -181,16 +189,17 @@ class DecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, target, memory):
-
         # Self Attention
         target2 = self.norm1(target)
         target = target + self.dropout(self.self_attention(target2))
 
-        # Cross attention of target with the memory from the encoder output
+        # Cross attention
         target2 = self.norm2(target)
-        target = target + self.dropout(self.cross_attention(target2, memory, memory))
+        target = target + self.dropout(
+            self.cross_attention(query=target2, key=memory, value=memory)
+        )
 
-        # Feed Forward NN
+        # Feed Forward
         target2 = self.norm3(target)
         target = target + self.dropout(self.feed_forward(target2))
 
