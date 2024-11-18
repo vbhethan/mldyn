@@ -30,25 +30,39 @@ class TransformerTimeSeriesModel(nn.Module):
         d_feedforward: int,
         dropout: float = 0.0,
         num_heads: int = 4,
+        return_attention: bool = False,
     ):
         super(TransformerTimeSeriesModel, self).__init__()
         self.n_time_steps = n_time_steps
         self.input_state_dimension = input_state_dimension
+        self.return_attention = return_attention
+
         self.residue_embedding = ResidueEmbeddingLayer(
             n_particles, input_state_dimension, d_model, n_particle_types
         )
 
-        # Create separate encoder and decoder for each time step
         self.encoders = nn.ModuleList(
             [
-                EncoderLayer(d_model, d_feedforward, dropout, num_heads=num_heads)
+                EncoderLayer(
+                    d_model,
+                    d_feedforward,
+                    dropout,
+                    num_heads=num_heads,
+                    return_attention=return_attention,
+                )
                 for _ in range(n_time_steps)
             ]
         )
 
         self.decoders = nn.ModuleList(
             [
-                DecoderLayer(d_model, d_feedforward, dropout, num_heads=num_heads)
+                DecoderLayer(
+                    d_model,
+                    d_feedforward,
+                    dropout,
+                    num_heads=num_heads,
+                    return_attention=return_attention,
+                )
                 for _ in range(n_time_steps)
             ]
         )
@@ -57,34 +71,50 @@ class TransformerTimeSeriesModel(nn.Module):
             [nn.Linear(d_model, input_state_dimension) for _ in range(n_time_steps)]
         )
 
-    def forward(
-        self, initial_condition: torch.Tensor, particle_types: torch.Tensor
-    ) -> List[torch.Tensor]:
-        # initial_condition shape: (batch_size, n_particles, input_state_dimension)
-        # particle_types shape: (batch_size, n_particles)
-
-        # Embed the initial condition
+    def forward(self, initial_condition: torch.Tensor, particle_types: torch.Tensor):
         x = self.residue_embedding(initial_condition, particle_types)
-
         predictions = []
 
-        # # intialize z to be equal to embedded initial condition
-        # z = x
+        if self.return_attention:
+            encoder_attention_maps = []
+            decoder_self_attention_maps = []
+            decoder_cross_attention_maps = []
 
         for t in range(self.n_time_steps):
-            # Encode z from x
-            z = self.encoders[t](x)
+            # Encode
+            if self.return_attention:
+                z, encoder_attention = self.encoders[t](x)
+                encoder_attention_maps.append(encoder_attention)
+            else:
+                z = self.encoders[t](x)
 
-            decoder_input = (
+            # For the first step use the initial condition as the target
+            # For subsequent steps use the previous prediction
+            target = (
                 x if t == 0 else self.residue_embedding(predictions[-1], particle_types)
             )
 
-            # z is the memory, decoder_input is what will attend to it
-            output = self.decoders[t](decoder_input, z)
+            # Decode
+            if self.return_attention:
+                output, decoder_self_attention, decoder_cross_attention = self.decoders[
+                    t
+                ](z, target)
+                decoder_self_attention_maps.append(decoder_self_attention)
+                decoder_cross_attention_maps.append(decoder_cross_attention)
+            else:
+                output = self.decoders[t](z, target)
 
-            # This output is what we're trying to predict
-            predictions.append(output)
+            # Project to the input state dimension
+            prediction = self.final_layers[t](output)
+            predictions.append(prediction)
 
+        if self.return_attention:
+            return (
+                predictions,
+                encoder_attention_maps,
+                decoder_self_attention_maps,
+                decoder_cross_attention_maps,
+            )
         return predictions
 
 

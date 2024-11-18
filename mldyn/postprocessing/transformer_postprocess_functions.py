@@ -1,33 +1,33 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 
 from mldyn.data.dataloaders import TimeSeriesDataset
-from mldyn.postprocessing.transformer_postprocess_model import (
-    PostProcessTransformerTimeSeriesModel,
-)
+from mldyn.models.transformer import TransformerTimeSeriesModel
 
 
 def load_trained_model(model_path, model):
+    """Load weights into model and enable attention map output"""
+    model.return_attention = True  # Enable attention map output
     model.load_state_dict(torch.load(model_path))
     return model
 
 
-def prepare_input_data(data_path, particle_identities_path, device):
+def prepare_input_data(data_path, particle_identities_path):
+    """Prepare dataset from file paths"""
     dataset = TimeSeriesDataset(data_path, particle_identities_path)
     return dataset
 
 
 def extract_attention_maps(model, initial_condition, particle_labels):
+    """Extract attention maps from model forward pass"""
     model.eval()
     with torch.no_grad():
         device = next(model.parameters()).device
         initial_condition = initial_condition.to(device)
         particle_labels = particle_labels.to(device)
+
         (
             predictions,
             encoder_attention_maps,
@@ -37,17 +37,20 @@ def extract_attention_maps(model, initial_condition, particle_labels):
 
     # Convert attention maps to numpy arrays after moving them to CPU
     encoder_attention_maps = [attn.cpu().numpy() for attn in encoder_attention_maps]
-    decoder_self_attention_maps = [attn.cpu().numpy() for attn in decoder_self_attention_maps]
-    decoder_cross_attention_maps = [attn.cpu().numpy() for attn in decoder_cross_attention_maps]
-        
-    # The attention maps will have shape (t_steps, batch_size, n_particles, n_particles)
-    # We will aggregate the attention maps across the batch dimension (for batch size 1 this just drops the batch dimension)
+    decoder_self_attention_maps = [
+        attn.cpu().numpy() for attn in decoder_self_attention_maps
+    ]
+    decoder_cross_attention_maps = [
+        attn.cpu().numpy() for attn in decoder_cross_attention_maps
+    ]
+
+    # The attention maps will have shape (batch_size, n_particles, n_particles)
+    # We will aggregate the attention maps across the batch dimension
     encoder_attention_maps = np.mean(np.stack(encoder_attention_maps), axis=1)
     decoder_self_attention_maps = np.mean(np.stack(decoder_self_attention_maps), axis=1)
     decoder_cross_attention_maps = np.mean(
         np.stack(decoder_cross_attention_maps), axis=1
     )
-    # Now the maps have shape (t_steps, n_particles, n_particles)
 
     return (
         encoder_attention_maps,
@@ -62,11 +65,13 @@ def visualize_attention_maps(
     decoder_cross_attention_maps,
     figure_directory="./",
 ):
+    """Visualize and save attention maps"""
+    os.makedirs(figure_directory, exist_ok=True)
 
     # Start with encoder attention maps
     for t, encoder_attention_map in enumerate(encoder_attention_maps):
         plt.figure(figsize=(10, 8))
-        plt.imshow(encoder_attention_map.squeeze().numpy(), cmap="viridis")
+        plt.imshow(encoder_attention_map, cmap="viridis")
         plt.colorbar()
         plt.title(f"Encoder Attention Map at Time Step {t}")
         plt.savefig(os.path.join(figure_directory, f"encoder_attention_map_{t}.png"))
@@ -75,7 +80,7 @@ def visualize_attention_maps(
     # Next, decoder self attention maps
     for t, decoder_self_attention_map in enumerate(decoder_self_attention_maps):
         plt.figure(figsize=(10, 8))
-        plt.imshow(decoder_self_attention_map.squeeze().numpy(), cmap="viridis")
+        plt.imshow(decoder_self_attention_map, cmap="viridis")
         plt.colorbar()
         plt.title(f"Decoder Self Attention Map at Time Step {t}")
         plt.savefig(
@@ -86,7 +91,7 @@ def visualize_attention_maps(
     # Finally, decoder cross attention maps
     for t, decoder_cross_attention_map in enumerate(decoder_cross_attention_maps):
         plt.figure(figsize=(10, 8))
-        plt.imshow(decoder_cross_attention_map.squeeze().numpy(), cmap="viridis")
+        plt.imshow(decoder_cross_attention_map, cmap="viridis")
         plt.colorbar()
         plt.title(f"Decoder Cross Attention Map at Time Step {t}")
         plt.savefig(
@@ -98,10 +103,7 @@ def visualize_attention_maps(
 def combine_attention_weights(
     encoder_attention, decoder_self_attention, decoder_cross_attention
 ):
-    """
-    Combine the attention weights from the encoder, decoder self attention, and decoder cross attention
-    """
-    # TODO: test different weights for each attention map?
+    """Combine the attention weights from different attention mechanisms"""
     combined = encoder_attention + decoder_self_attention + decoder_cross_attention
     # Normalize so all attention weights sum to 1 for a target particle
     return combined / (combined.sum(axis=-1, keepdims=True))
