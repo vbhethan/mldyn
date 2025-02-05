@@ -35,6 +35,8 @@ class TransformerTimeSeriesModel(nn.Module):
         super(TransformerTimeSeriesModel, self).__init__()
         self.n_time_steps = n_time_steps
         self.input_state_dimension = input_state_dimension
+        self.n_particles = n_particles
+        self.n_particle_types = n_particle_types
         self.return_attention = return_attention
 
         self.residue_embedding = ResidueEmbeddingLayer(
@@ -115,6 +117,7 @@ class TransformerTimeSeriesModel(nn.Module):
                 decoder_self_attention_maps,
                 decoder_cross_attention_maps,
             )
+        predictions = torch.stack(predictions, dim=1)
         return predictions
 
 
