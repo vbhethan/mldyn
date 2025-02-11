@@ -61,7 +61,7 @@ def validate(model, dataloader, criterion, device):
 def main():
 
     # Define hyperparameters
-    n_particles = 148
+    n_particles = 20
     input_state_dimension = 6
     d_model = 128
     n_particle_types = 20
@@ -74,9 +74,8 @@ def main():
     batch_size = 4
 
     # Paths to datafiles
-    train_data_path = "./sim_data/train_data.npy"
-    particle_identities_path = "particle_identities.txt"
-    val_data_path = "./val_data.npy"
+    train_data_path = "./sim_data/"
+    particle_identities_path = "./sim_data/particle_identities.txt"
 
     # Configure device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
