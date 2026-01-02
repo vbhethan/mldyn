@@ -59,7 +59,6 @@ def validate(model, dataloader, criterion, device):
 
 
 def main():
-
     # Define hyperparameters
     n_particles = 20
     input_state_dimension = 6

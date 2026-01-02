@@ -11,13 +11,13 @@ from mldyn.models.transformer import TransformerTimeSeriesModel
 
 
 def main(data_path, particle_identities_path, model_path):
-    # Define hyperparameters (Make sure these match training configuration)
-    n_particles = 388
+    # Hyperparameters aligned with train.py
+    n_particles = 20
     input_state_dimension = 6
     d_model = 128
     n_particle_types = 20
-    n_time_steps = 49
-    d_feedforward = 128
+    n_time_steps = 19  # window_size=20 -> 19 target steps
+    d_feedforward = 256
 
     # Configure device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,10 +78,10 @@ def main(data_path, particle_identities_path, model_path):
 
 
 if __name__ == "__main__":
-    # Data Paths
+    # Data Paths consistent with training defaults
     model_path = "./model.pth"
-    data_path = "../sim_data/subselect_2000.npy"
-    particle_identities_path = "../particle_identities.txt"
+    data_path = "./sim_data/"
+    particle_identities_path = "./sim_data/particle_identities.txt"
 
     main(
         data_path=data_path,
