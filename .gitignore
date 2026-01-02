@@ -68,6 +68,9 @@ venv.bak/
 # VSCODE
 .vscode
 
+# MacOS
+.DS_Store
+
 # Working/testsing code
 working*
 
