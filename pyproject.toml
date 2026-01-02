@@ -1,7 +1,48 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "mldyn"
+version = "0.1.0"
+description = "Transformer-based molecular dynamics modeling utilities."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Vignesh C. Bhethanabotla", email = "vbhethan@caltech.edu" }]
+license = { text = "MIT" }
+dependencies = [
+    "torch>=2.2",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+postprocess = [
+    "matplotlib>=3.7",
+    "tqdm>=4.66",
+]
+preprocess = [
+    "MDAnalysis>=2.6",
+    "h5py>=3.10",
+    "scipy>=1.11",
+    "tqdm>=4.66",
+]
+dev = [
+    "pytest>=7.4",
+    "black>=23.12",
+    "ruff>=0.3",
+]
+cuda = [
+    # Install with the PyTorch CUDA wheels index:
+    # pip install --extra-index-url https://download.pytorch.org/whl/cu121 "mldyn[cuda]"
+    "torch==2.2.2+cu121",
+]
+cpu = [
+    "torch>=2.2",
+]
+
+[tool.setuptools.packages.find]
+include = ["mldyn*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"] 
+python_files = ["test_*.py"]
