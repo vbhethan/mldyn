@@ -13,19 +13,14 @@ license = { text = "MIT" }
 dependencies = [
     "torch>=2.2",
     "numpy>=1.24",
-]
-
-[project.optional-dependencies]
-postprocess = [
-    "matplotlib>=3.7",
-    "tqdm>=4.66",
-]
-preprocess = [
     "MDAnalysis>=2.6",
     "h5py>=3.10",
     "scipy>=1.11",
     "tqdm>=4.66",
+    "matplotlib>=3.7",
 ]
+
+[project.optional-dependencies]
 dev = [
     "pytest>=7.4",
     "black>=23.12",

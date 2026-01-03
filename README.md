@@ -5,19 +5,23 @@ Vignesh C. Bhethanabotla
 This repo trains an autoregressive transformer on molecular dynamics trajectories of polypeptides/proteins to forecast future states and reveal interaction pathways. By analyzing the model’s attention/latent edges through a Granger-causality lens, we probe how residue interactions propagate and influence downstream motion. It includes preprocessing utilities (with the MDAnalysis package) to coarse-grain trajectories and prepare inputs (works with standard protein residue/atom naming; tested on GROMACS outputs), plus postprocessing tools to analyze trained models and generate visualizations.
 
 ## Installation
+
+First, clone the repository
+`git clone git@github.com:vbhethan/gno-dynamics.git`
+
+cd into the directory, then use pip to install the package.
+
 The package can be installed using pip with the following options
 - Base (CPU PyTorch): `pip install .` or `pip install ".[cpu]"`
 - For CUDA support (PyTorch 2.2.2 cu121):  
   `pip install --extra-index-url https://download.pytorch.org/whl/cu121 ".[cuda]"`
-- To include Preprocessing tools (MDAnalysis, h5py, scipy, tqdm): `pip install ".[preprocess]"`
-- Postprocessing/visualization (matplotlib, tqdm): `pip install ".[postprocess]"`
 - Dev tools (pytest, black, ruff): `pip install ".[dev]"`
 
-Extras can be combined, e.g. `pip install ".[cpu,preprocess,postprocess]"`.
+Extras can be combined, e.g. `pip install ".[cpu,dev]"`.
 
 For example, to install with CUDA support and with pre- and post-processing utilities, run the following after navigating to the project directory
 
-`pip install --extra-index-url https://download.pytorch.org/whl/cu121 ".[cuda,preprocess,postprocess]"`
+`pip install --extra-index-url https://download.pytorch.org/whl/cu121 ".[cuda]"`
 
 ## Quick start / Example run
 Example data (short polypeptide MD trajectories) are provided in `sim_data`. To train on the example set:
@@ -77,7 +81,7 @@ particle_identities_path = "./sim_data/particle_identities.txt"
 
 - Run training: `python train.py` (will use CUDA if available); saves `model.pth`.
 
-## Postprocesing    
+## Postprocessing    
 Refer to `post-process.py` for an end-to-end example. It loads a trained model with attention outputs enabled, runs over the dataset, aggregates encoder/self/cross attention across samples, and saves the averaged weights to `combined_attention_weights.npy`. Running:
 `python post-process.py`
 will load `model.pth`, read data from `./sim_data/`, and write the aggregated attention maps, which can then be analyzed / visualized to examine the learned interactions between the residues. 
@@ -93,3 +97,9 @@ will load `model.pth`, read data from `./sim_data/`, and write the aggregated at
 - `post-process.py`: example postprocessing script (averages attention maps)
 - `sim_data/`: sample trajectories and `particle_identities.txt`
 - `tests/`: basic tests for dataloader and model
+
+## Links
+
+- Work based on this code was presented at MLSB @ NeurIPS 2024 [link](https://www.mlsb.io/papers_2024/Capturing_Protein_Dynamics:_Encoding_Temporal_and_Spatial_Dynamics_from_Molecular_Dynamics_Simulations.pdf)
+- This work was also presented at the AIChE 2024 Annual Meeting [Slides]()
+
