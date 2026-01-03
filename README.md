@@ -101,5 +101,5 @@ will load `model.pth`, read data from `./sim_data/`, and write the aggregated at
 ## Links
 
 - Work based on this code was presented at MLSB @ NeurIPS 2024 [link](https://www.mlsb.io/papers_2024/Capturing_Protein_Dynamics:_Encoding_Temporal_and_Spatial_Dynamics_from_Molecular_Dynamics_Simulations.pdf)
-- This work was also presented at the AIChE 2024 Annual Meeting [Slides]()
+- This work was also presented at the AIChE 2024 Annual Meeting [Slides](media/AIChE-talk.pdf)
 
