@@ -4,6 +4,10 @@ Vignesh C. Bhethanabotla
 ## Overview
 This repo trains an autoregressive transformer on molecular dynamics trajectories of polypeptides/proteins to forecast future states and reveal interaction pathways. By analyzing the model’s attention/latent edges through a Granger-causality lens, we probe how residue interactions propagate and influence downstream motion. It includes preprocessing utilities (with the MDAnalysis package) to coarse-grain trajectories and prepare inputs (works with standard protein residue/atom naming; tested on GROMACS outputs), plus postprocessing tools to analyze trained models and generate visualizations.
 
+Some links containing further explanation and results:
+- Work based on this code was presented at MLSB @ NeurIPS 2024 [link](https://www.mlsb.io/papers_2024/Capturing_Protein_Dynamics:_Encoding_Temporal_and_Spatial_Dynamics_from_Molecular_Dynamics_Simulations.pdf)
+- This work was also presented at the AIChE 2024 Annual Meeting [slides](media/AIChE-talk.pdf)
+
 ## Installation
 
 First, clone the repository
@@ -18,10 +22,6 @@ The package can be installed using pip with the following options
 - Dev tools (pytest, black, ruff): `pip install ".[dev]"`
 
 Extras can be combined, e.g. `pip install ".[cpu,dev]"`.
-
-For example, to install with CUDA support and with pre- and post-processing utilities, run the following after navigating to the project directory
-
-`pip install --extra-index-url https://download.pytorch.org/whl/cu121 ".[cuda]"`
 
 ## Quick start / Example run
 Example data (short polypeptide MD trajectories) are provided in `sim_data`. To train on the example set:
@@ -98,8 +98,4 @@ will load `model.pth`, read data from `./sim_data/`, and write the aggregated at
 - `sim_data/`: sample trajectories and `particle_identities.txt`
 - `tests/`: basic tests for dataloader and model
 
-## Links
-
-- Work based on this code was presented at MLSB @ NeurIPS 2024 [link](https://www.mlsb.io/papers_2024/Capturing_Protein_Dynamics:_Encoding_Temporal_and_Spatial_Dynamics_from_Molecular_Dynamics_Simulations.pdf)
-- This work was also presented at the AIChE 2024 Annual Meeting [Slides](media/AIChE-talk.pdf)
 
