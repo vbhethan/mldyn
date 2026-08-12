@@ -3,7 +3,11 @@ import numpy as np
 import torch
 import tempfile
 import os
-from mldyn.data.dataloaders import TimeSeriesDataset, create_dataloader
+from mldyn.data.dataloaders import (
+    AMINO_ACID_CODES,
+    TimeSeriesDataset,
+    create_dataloader,
+)
 
 
 @pytest.fixture
@@ -125,3 +129,39 @@ def test_dataloader(sample_data):
         batch_size,
         sample_data["expected_shapes"]["n_particles"],
     )
+
+
+def write_sequence_dataset(directory, sequence_text, n_particles):
+    """Write a single random tape plus a particle identities file"""
+    np.save(os.path.join(directory, "tape_0.npy"), np.random.rand(10, n_particles, 6))
+    identities_path = os.path.join(directory, "particle_identities.txt")
+    with open(identities_path, "w") as f:
+        f.write(sequence_text)
+    return identities_path
+
+
+def test_particle_labels_use_canonical_alphabet(tmp_path):
+    sequence = "VALK"
+    identities_path = write_sequence_dataset(str(tmp_path), sequence, len(sequence))
+
+    dataset = TimeSeriesDataset(str(tmp_path), identities_path, window_size=5)
+
+    assert dataset.particle_labels.tolist() == [
+        AMINO_ACID_CODES.index(code) for code in sequence
+    ]
+    assert dataset.particle_labels.tolist() == [17, 0, 9, 8]
+
+
+def test_sequence_whitespace_is_ignored(tmp_path):
+    identities_path = write_sequence_dataset(str(tmp_path), "VA\nLK\n", 4)
+
+    dataset = TimeSeriesDataset(str(tmp_path), identities_path, window_size=5)
+
+    assert dataset.particle_labels.tolist() == [17, 0, 9, 8]
+
+
+def test_unrecognized_residue_code_raises(tmp_path):
+    identities_path = write_sequence_dataset(str(tmp_path), "VAZK", 4)
+
+    with pytest.raises(ValueError, match="Unrecognized amino-acid codes"):
+        TimeSeriesDataset(str(tmp_path), identities_path, window_size=5)

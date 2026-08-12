@@ -4,6 +4,9 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from glob import glob
 
+AMINO_ACID_CODES = "ACDEFGHIKLMNPQRSTVWY"
+IDENTITY_TO_LABEL = {code: i for i, code in enumerate(AMINO_ACID_CODES)}
+
 
 class TimeSeriesDataset(Dataset):
     def __init__(self, data_path, particle_identities_path, window_size=20):
@@ -28,18 +31,22 @@ class TimeSeriesDataset(Dataset):
             end_index += tape_length
         self.valid_starting_indices = np.concatenate(self.valid_starting_indices)
 
-        # Load particle identities
         with open(particle_identities_path, "r") as f:
-            sequence_string = f.read().strip()
+            sequence_string = f.read().upper()
             particle_identities = [
-                amino_acid_code for amino_acid_code in sequence_string
+                amino_acid_code
+                for amino_acid_code in sequence_string
+                if not amino_acid_code.isspace()
             ]
 
-        # Convert particle identities to integer labels
-        unique_identities = list(set(particle_identities))
-        self.identity_to_label = {
-            identity: i for i, identity in enumerate(unique_identities)
-        }
+        unrecognized = sorted(set(particle_identities) - set(IDENTITY_TO_LABEL))
+        if unrecognized:
+            raise ValueError(
+                f"Unrecognized amino-acid codes in {particle_identities_path}: "
+                f"{''.join(unrecognized)}. Expected 1-letter codes drawn from "
+                f"{AMINO_ACID_CODES}."
+            )
+        self.identity_to_label = dict(IDENTITY_TO_LABEL)
         self.particle_labels = torch.tensor(
             [self.identity_to_label[identity] for identity in particle_identities]
         )
