@@ -41,3 +41,40 @@ include = ["mldyn*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# Pixi environment. `pixi install` builds .pixi/ and installs mldyn editable.
+# Add "linux-64" to platforms when setting this up on a cluster.
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+mldyn = { path = ".", editable = true }
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+pytorch = ">=2.2"
+numpy = ">=1.24"
+mdanalysis = ">=2.6"
+h5py = ">=3.10"
+scipy = ">=1.11"
+tqdm = ">=4.66"
+matplotlib-base = ">=3.7"
+
+[tool.pixi.feature.dev.dependencies]
+pytest = ">=7.4"
+black = ">=23.12"
+ruff = ">=0.3"
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+
+[tool.pixi.tasks]
+train = "python train.py"
+post-process = "python post-process.py"
+
+[tool.pixi.feature.dev.tasks]
+test = "pytest"
+fmt = "black ."
+lint = "ruff check ."
