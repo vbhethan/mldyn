@@ -10,6 +10,7 @@ import numpy as np
 
 import torch.nn.functional as F
 
+
 def my_softmax(input, axis=1):
     trans_input = input.transpose(axis, 0).contiguous()
     soft_max_1d = F.softmax(trans_input, dim=0)
@@ -18,11 +19,10 @@ def my_softmax(input, axis=1):
 
 def encode_onehot(labels):
     classes = set(labels)
-    classes_dict = {c: np.identity(len(classes))[i, :] for i, c in
-                    enumerate(classes)}
-    labels_onehot = np.array(list(map(classes_dict.get, labels)),
-                             dtype=np.int32)
+    classes_dict = {c: np.identity(len(classes))[i, :] for i, c in enumerate(classes)}
+    labels_onehot = np.array(list(map(classes_dict.get, labels)), dtype=np.int32)
     return labels_onehot
+
 
 def get_triu_indices(num_nodes):
     """Linear triu (upper triangular) indices."""
@@ -42,7 +42,6 @@ def get_tril_indices(num_nodes):
     return tril_indices
 
 
-
 def sample_gumbel(shape, eps=1e-10):
     """
     NOTE: Stolen from https://github.com/pytorch/pytorch/pull/3341/commits/327fcfed4c44c62b208f750058d14d4dc1b9a9d3
@@ -54,7 +53,7 @@ def sample_gumbel(shape, eps=1e-10):
     (MIT license)
     """
     U = torch.rand(shape).float()
-    return - torch.log(eps - torch.log(U + eps))
+    return -torch.log(eps - torch.log(U + eps))
 
 
 def gumbel_softmax_sample(logits, tau=1, eps=1e-10):
@@ -72,6 +71,7 @@ def gumbel_softmax_sample(logits, tau=1, eps=1e-10):
         gumbel_noise = gumbel_noise.cuda()
     y = logits + Variable(gumbel_noise)
     return my_softmax(y / tau, axis=-1)
+
 
 def gumbel_softmax(logits, tau=1, hard=False, eps=1e-10):
     """
@@ -116,7 +116,7 @@ def gumbel_softmax(logits, tau=1, hard=False, eps=1e-10):
 
 
 def nll_gaussian(preds, target, variance, add_const=False):
-    neg_log_p = ((preds - target) ** 2 / (2 * variance))
+    neg_log_p = (preds - target) ** 2 / (2 * variance)
     if add_const:
         const = 0.5 * np.log(2 * np.pi * variance)
         neg_log_p += const
@@ -128,8 +128,9 @@ def kl_categorical(preds, log_prior, num_atoms, eps=1e-16):
     return kl_div.sum() / (num_atoms * preds.size(0))
 
 
-def kl_categorical_uniform(preds, num_atoms, num_edge_types, add_const=False,
-                           eps=1e-16):
+def kl_categorical_uniform(
+    preds, num_atoms, num_edge_types, add_const=False, eps=1e-16
+):
     kl_div = preds * torch.log(preds + eps)
     if add_const:
         const = np.log(num_edge_types)
